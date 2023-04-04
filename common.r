@@ -17,3 +17,6 @@ sample_tags = list(
   "pbmc" = "HTO_A,HTO_B,HTO_C,HTO_D,HTO_E,HTO_F,HTO_G,HTO_H"
 )
 
+htocols<-c("scDemultiplex", "HTODemux", "MULTIseqDemux", "GMM_Demux", "BFF_raw", "BFF_cluster")
+htonames<-c("scDemultiplex", "HTODemux", "MULTIseqDemux", "GMM-Demux", "BFF_raw", "BFF_cluster")
+names(htonames)<-htocols

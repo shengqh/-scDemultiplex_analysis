@@ -1,5 +1,5 @@
 ---
-title: "HTO Report"
+title: "scDemultiplex Refinement Report"
 author: "Quanhu Sheng"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -127,13 +127,9 @@ figureRmd<-function(names){
   result<-""
   name = names[1]
   for(name in names){
-    prefix = file.path(root_dir, name, name)
+    prefix = file.path(root_dir, name, "scDemultiplex_refine", name)
     
     result<-paste0(result, paste0("\n\n# ", name, "\n\n"))
-
-    result<-paste0(result, paste0("\n\n## Number of cells\n\n"))
-
-    result<-paste0(result, getTable(paste0(prefix, ".ncell.csv")))
 
     result<-paste0(result, paste0("\n\n## Demultiplex result\n\n"))
 
