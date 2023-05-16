@@ -1,29 +1,13 @@
 source('/home/shengq2/program/scDemultiplex_analysis/common.r')
 
+library(cellhashR)
+
 sample_map = list(
   "hto12"=list("HTO"="hto12_hto_mtx.rds", "RNA"="hto12_umi_mtx.rds"),
   "pbmc"=list("HTO"="pbmc_hto_mtx.rds", "RNA"="pbmc_umi_mtx.rds")
 )
 
 ignored_tags<-c("no_match","ambiguous","total_reads","bad_struct")
-
-save_to_matrix<-function(counts, target_folder) {
-  if(!dir.exists(target_folder)){
-    dir.create(target_folder)
-  }
-  
-  bar_file=paste0(target_folder, "/barcodes.tsv")
-  writeLines(colnames(counts), bar_file)
-  gzip(bar_file, overwrite=T)
-  
-  feature_file=paste0(target_folder, "/features.tsv")
-  writeLines(rownames(counts), feature_file)
-  gzip(feature_file, overwrite=T)
-  
-  matrix_file=paste0(target_folder, "/matrix.mtx")
-  writeMM(counts, matrix_file)
-  gzip(matrix_file, overwrite=T)
-}
 
 prepare_data<-function(root_dir, sample_map, cur_sample) {
   sample_folder=paste0(root_dir, cur_sample)
@@ -104,8 +88,6 @@ prepare_data<-function(root_dir, sample_map, cur_sample) {
 }
 
 do_bff_raw<-function(root_dir, cur_sample) {
-  library(cellhashR)
-
   sample_folder=paste0(root_dir, cur_sample)
   setwd(sample_folder)
 
@@ -147,8 +129,6 @@ do_bff_raw<-function(root_dir, cur_sample) {
 }
 
 do_bff_cluster<-function(root_dir, cur_sample) {
-  library(cellhashR)
-
   sample_folder=paste0(root_dir, cur_sample)
   setwd(sample_folder)
   
@@ -208,8 +188,11 @@ do_scDemultiplex<-function(root_dir, cur_sample, p.cut=0.001){
   sample_folder=paste0(root_dir, cur_sample)
   setwd(sample_folder)
   
-  final_rds = paste0( "scDemultiplex/", cur_sample, ".scDemultiplex.rds")
+  final_file=paste0(cur_sample, ".scDemultiplex.", p.cut, ".rds")
+  final_rds=paste0( "scDemultiplex/", final_file)
   if(!file.exists(final_rds)){
+    cat("scDemultiplex ...\n")
+
     rds_file=paste0(cur_sample, ".obj.rds")
     obj=readRDS(rds_file)
 
@@ -220,8 +203,6 @@ do_scDemultiplex<-function(root_dir, cur_sample, p.cut=0.001){
       dir.create(result_folder)
     }
     setwd(result_folder)
-
-    final_file=paste0(cur_sample, ".scDemultiplex.rds")
     
     output_prefix<-paste0(cur_sample, ".HTO")
 
@@ -234,11 +215,11 @@ do_scDemultiplex<-function(root_dir, cur_sample, p.cut=0.001){
     obj$scDemultiplex_full=obj$scDemultiplex
     obj$scDemultiplex_full.global=obj$scDemultiplex.global
     toc3=toc()
-    cat("  scDemultiplex_negative_doublet_only ...\n")
-    obj<-demulti_refine(obj, p.cut, refine_negative_doublet_only=TRUE, mc.cores=ntags)
-    toc2=toc()
+    # cat("  scDemultiplex_negative_doublet_only ...\n")
+    # obj<-demulti_refine(obj, p.cut, refine_negative_doublet_only=TRUE, mc.cores=ntags)
+    # toc2=toc()
 
-    saveRDS(list("cutoff"=toc1, "refine"=toc2, "full"=toc3), paste0(cur_sample, ".scDemultiplex.tictoc.rds"))
+    saveRDS(list("cutoff"=toc1, "full"=toc3), paste0(cur_sample, ".scDemultiplex.tictoc.rds"))
 
     obj<-hto_plot(obj, paste0(output_prefix, ".cutoff"), group.by="scDemultiplex_cutoff")
     obj<-hto_plot(obj, paste0(output_prefix, ".refine_p", p.cut), group.by="scDemultiplex")
@@ -315,6 +296,77 @@ do_seurat_MULTIseqDemux<-function(root_dir, cur_sample){
   }
 }
 
+do_demuxmix<-function(root_dir, cur_sample){
+  sample_folder=paste0(root_dir, cur_sample)
+  setwd(sample_folder)
+
+  final_rds = paste0( "demuxmix/", cur_sample, ".demuxmix.rds")
+  if(!file.exists(final_rds)){
+    rds_file=paste0(cur_sample, ".obj.rds")
+    obj=readRDS(rds_file)
+    
+    result_folder=paste0(sample_folder, "/demuxmix")
+    if(!dir.exists(result_folder)){
+      dir.create(result_folder)
+    }
+    setwd(result_folder)
+
+    hto_counts <- as.matrix(GetAssayData(obj[["HTO"]], slot = "counts"))
+
+    tic(paste0("starting ", cur_sample, "...\n"))
+    dmm <- demuxmix(hto_counts, model = "naive")
+    dmm_calls <- dmmClassify(dmm)
+    toc1=toc()
+
+    obj$demuxmix <- case_when(
+                  dmm_calls$Type == "multiplet" ~ "Doublet",
+                  dmm_calls$Type %in% c("negative", "uncertain") ~ "Negative",
+                  .default = dmm_calls$HTO)
+    
+    saveRDS(list("demuxmix"=toc1), paste0(cur_sample, ".demuxmix.tictoc.rds"))
+    
+    obj<-hto_plot(obj, paste0(cur_sample, ".demuxmix"), group.by="demuxmix")
+
+    saveRDS(obj, paste0(cur_sample, ".demuxmix.rds"))
+  }
+}
+
+do_hashedDrops<-function(root_dir, cur_sample){
+  sample_folder=paste0(root_dir, cur_sample)
+  setwd(sample_folder)
+
+  final_rds = paste0( "hashedDrops/", cur_sample, ".hashedDrops.rds")
+  if(!file.exists(final_rds)){
+    rds_file=paste0(cur_sample, ".obj.rds")
+    obj=readRDS(rds_file)
+    
+    result_folder=paste0(sample_folder, "/hashedDrops")
+    if(!dir.exists(result_folder)){
+      dir.create(result_folder)
+    }
+    setwd(result_folder)
+
+    hto_counts <- as.matrix(GetAssayData(obj[["HTO"]], slot = "counts"))
+
+    tic(paste0("starting ", cur_sample, "...\n"))
+    hash_stats <- DropletUtils::hashedDrops(hto_counts)
+    toc1=toc()
+
+    hash_stats$Best <- rownames(obj[["HTO"]])[hash_stats$Best]
+    
+    obj$hashedDrops <- case_when(
+      hash_stats$Confident == TRUE ~ hash_stats$Best,
+      hash_stats$Doublet == TRUE ~ "Doublet",
+      TRUE ~ "Negative")
+    
+    saveRDS(list("hashedDrops"=toc1), paste0(cur_sample, ".hashedDrops.tictoc.rds"))
+    
+    obj<-hto_plot(obj, paste0(cur_sample, ".hashedDrops"), group.by="hashedDrops")
+
+    saveRDS(obj, paste0(cur_sample, ".hashedDrops.rds"))
+  }
+}
+
 do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample){
   obj_file = paste0(root_dir, "/", cur_sample, "/", cur_sample, ".obj.rds")
   if(!file.exists(obj_file)){
@@ -328,11 +380,11 @@ do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample){
     do_bff_raw(root_dir, cur_sample)
   }
 
-  bff_cluster_file = paste0(root_dir, "/", cur_sample, "/bff_cluster/", cur_sample, ".bff_cluster.rds")
-  if(!file.exists(bff_cluster_file)){
-    cat("bff_cluster ...\n")
-    do_bff_cluster(root_dir, cur_sample)
-  }
+  # bff_cluster_file = paste0(root_dir, "/", cur_sample, "/bff_cluster/", cur_sample, ".bff_cluster.rds")
+  # if(!file.exists(bff_cluster_file)){
+  #   cat("bff_cluster ...\n")
+  #   do_bff_cluster(root_dir, cur_sample)
+  # }
 
   gmm_file = paste0(root_dir, "/", cur_sample, "/GMM-demux/GMM_full.csv")
   if(!file.exists(gmm_file)){
@@ -340,11 +392,7 @@ do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample){
     do_GMMDemux(root_dir, sample_tags, cur_sample)
   }
 
-  scDemultiplex_file = paste0(root_dir, "/", cur_sample, "/scDemultiplex/", cur_sample, ".scDemultiplex.rds")
-  if(!file.exists(scDemultiplex_file)){
-    cat("scDemultiplex ...\n")
-    do_scDemultiplex(root_dir, cur_sample)
-  }
+  do_scDemultiplex(root_dir, cur_sample, p.cut=0.00001)
 
   htodemux_file = paste0(root_dir, "/", cur_sample, "/HTODemux/", cur_sample, ".HTODemux.rds")
   if(!file.exists(htodemux_file)){
@@ -358,10 +406,23 @@ do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample){
     do_seurat_MULTIseqDemux(root_dir, cur_sample)
   }
 
+  demuxmix_file = paste0(root_dir, "/", cur_sample, "/demuxmix/", cur_sample, ".demuxmix.rds")
+  if(!file.exists(demuxmix_file)){
+    cat("demuxmix ...\n")
+    do_demuxmix(root_dir, cur_sample)
+  }
+
+  hashedDrops_file = paste0(root_dir, "/", cur_sample, "/hashedDrops/", cur_sample, ".hashedDrops.rds")
+  if(!file.exists(hashedDrops_file)){
+    cat("hashedDrops ...\n")
+    do_hashedDrops(root_dir, cur_sample)
+  }
+
   cat("done.\n")
 }
 
 cur_sample = "hto12"
 for(cur_sample in samples){
+  cat("processing", cur_sample, "\n")
   do_analysis(root_dir, sample_map, sample_tags, cur_sample)
 }

@@ -5,6 +5,7 @@ do_scDemultiplex_refine<-function(root_dir, cur_sample, p.cut=0.001){
   setwd(sample_folder)
 
   result_rds_file = paste0(cur_sample, ".results_obj.rds")
+  cat("read", result_rds_file, "\n")
   obj <- readRDS(result_rds_file)
 
   stopifnot(all(obj$scDemultiplex_full == obj$scDemultiplex))
@@ -19,26 +20,31 @@ do_scDemultiplex_refine<-function(root_dir, cur_sample, p.cut=0.001){
 
   final_file=paste0(cur_sample, ".scDemultiplex_refine.rds")
   
+  col=htocols[6]
   for(col in htocols){
     if(col == "scDemultiplex") {
       next
     }
+    cat("refine", col, "\n")
 
     newcol = paste0(col, "_scDemultiplex")
-    meta_rds_file = paste0(cur_sample, ".", newcol, "_p", p.cut, ".rds")
+    prefix = paste0(cur_sample, ".", newcol, "_p", p.cut)
+    meta_rds_file = paste0(prefix, ".rds")
     if(file.exists(meta_rds_file)){
       cat("  read ", meta_rds_file, " ...\n")
-      obj@meta.data=readRDS(meta_rds_file)
+      meta=readRDS(meta_rds_file)
+      obj@meta.data[,newcol]=meta[,newcol]
+      obj@meta.data[,paste0(newcol, ".global")]=meta[,paste0(newcol, ".global")]
     }else{
-      cat("  scDemultiplex refinement of ", col, " ...\n")
+      cat("  scDemultiplex refinement of", col, " ...\n")
       obj<-demulti_refine(obj, p.cut, refine_negative_doublet_only=FALSE, mc.cores=ntags, init_column=col)
       obj@meta.data[,newcol]=obj$scDemultiplex
       obj@meta.data[,paste0(newcol, ".global")]=obj$scDemultiplex.global
 
-      saveRDS(obj@meta.data, paste0(cur_sample, ".", newcol, "_p", p.cut, ".rds"))
-    }
+      saveRDS(obj@meta.data, meta_rds_file)
 
-    obj<-hto_plot(obj, paste0(cur_sample, ".", newcol, "_p", p.cut), group.by=newcol)
+      obj<-hto_plot(obj, prefix, group.by=newcol)
+    }
   }
 
   saveRDS(obj, final_file)

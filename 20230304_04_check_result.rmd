@@ -147,6 +147,14 @@ figureRmd<-function(names){
     
     result<-paste0(result, getTableRow(paste0(prefix, ".de.csv")))
 
+    
+    if(grepl("batch", name)){
+      result<-paste0(result, paste0("\n\n## AdjustRandIndex\n\n"))
+      result<-paste0(result, getTableColumn(paste0(prefix, ".ari.csv")))
+      result<-paste0(result, paste0("\n\n## F score\n\n"))
+      result<-paste0(result, getTableColumn(paste0(prefix, ".fscore.csv")))
+    }
+
     if(name == "hto12"){
       result<-paste0(result, paste0("\n\n## AdjustRandIndex\n\n"))
 

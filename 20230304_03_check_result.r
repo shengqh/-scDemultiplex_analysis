@@ -39,8 +39,14 @@ prepare_sample<-function(root_dir, sample_tags, name){
 
   tag_names=gsub('_', '-', unlist(str_split(sample_tags[[name]], ',')))
 
+  if(grepl("batch", name)){
+    cur_htocols = c("genetic_HTO", htocols)
+  }else{
+    cur_htocols = htocols
+  }
+
   #replace all Doublet as Multiplex
-  for(col in htocols){
+  for(col in cur_htocols){
     htos@meta.data[,col]<-as.character(htos@meta.data[,col])
     htos@meta.data[,col][htos@meta.data[,col]=="Doublet"]<-"Multiplet"
     htos@meta.data[,col]<-factor(htos@meta.data[,col], levels=c(tag_names, "Negative", "Multiplet"))
@@ -48,7 +54,7 @@ prepare_sample<-function(root_dir, sample_tags, name){
 
   meta<-htos@meta.data
 
-  for(col in htocols){
+  for(col in cur_htocols){
     newcol.global.name<-gsub("-", "_", paste0(col, ".global"))
     newcol.global<-as.character(meta[,col])
     newcol.global[!newcol.global %in% c("Negative", "Multiplet")]<-"Singlet"
@@ -71,27 +77,33 @@ prepare_sample<-function(root_dir, sample_tags, name){
   return(list(htos=htos, htocols=htocols, g1=g1, g2=g2))
 }
 
-name="hto12"
+name="batch1"
 process_sample<-function(root_dir, sample_tags, name){
   setwd(file.path(root_dir, name))
 
-  raw_htos = readRDS(paste0(name, "_hto_mtx.rds"))
-  raw_exps = readRDS(paste0(name, "_umi_mtx.rds"))
-  if(name == "hto12"){
-    common_cells = intersect(rownames(raw_htos), colnames(raw_exps))
-    n_hto = nrow(raw_htos)
-  }else{
-    common_cells = intersect(colnames(raw_htos), colnames(raw_exps))
-    n_hto = ncol(raw_htos)
-  }
-  n_umi = ncol(raw_exps)
+  if(!grepl("batch", name)){
+    raw_htos = readRDS(paste0(name, "_hto_mtx.rds"))
+    raw_exps = readRDS(paste0(name, "_umi_mtx.rds"))
+    if(name == "hto12"){
+      common_cells = intersect(rownames(raw_htos), colnames(raw_exps))
+      n_hto = nrow(raw_htos)
+    }else{
+      common_cells = intersect(colnames(raw_htos), colnames(raw_exps))
+      n_hto = ncol(raw_htos)
+    }
+    n_umi = ncol(raw_exps)
 
-  final_cells = colnames(readRDS(paste0(name, ".obj.rds")))
-  write.csv(data.frame("Category" = c("HTO cells", "UMI cells", "Common cells", "Filtered cells"),
-                       "Cell" = c(n_hto, n_umi, length(common_cells), length(final_cells))), paste0(name, ".ncell.csv"), row.names=F)
-  rm(raw_htos)
-  rm(raw_exps)
-  
+    final_cells = colnames(readRDS(paste0(name, ".obj.rds")))
+    write.csv(data.frame("Category" = c("HTO cells", "UMI cells", "Common cells", "Filtered cells"),
+                        "Cell" = c(n_hto, n_umi, length(common_cells), length(final_cells))), paste0(name, ".ncell.csv"), row.names=F)
+    rm(raw_htos)
+    rm(raw_exps)
+  }else{
+    final_cells = colnames(readRDS(paste0(name, ".obj.rds")))
+    write.csv(data.frame("Category" = c("HTO cells"),
+                        "Cell" = c(length(final_cells))), paste0(name, ".ncell.csv"), row.names=F)
+  }
+
   cat("\n\n##", name, "\n\n")
   hto_list<-prepare_sample(root_dir, sample_tags, name)
   obj<-hto_list$htos
@@ -99,9 +111,15 @@ process_sample<-function(root_dir, sample_tags, name){
   meta$log_nCount_HTO<-log2(meta$nCount_HTO + 1)
 
   cat("\n\n### HTO demultiplex methods\n\n")
-  
+
+  if(grepl("batch", name)){
+    cur_htocols = c("genetic_HTO", htocols)
+  }else{
+    cur_htocols = htocols
+  }
+
   alltb<-NULL
-  for (col in hto_list$htocols){
+  for (col in cur_htocols){
     coltb<-table(meta[,col])
     if(is.null(alltb)){
       alltb<-rbind(alltb, coltb)
@@ -110,15 +128,18 @@ process_sample<-function(root_dir, sample_tags, name){
       alltb<-rbind(alltb, coltb)
     }
   }
-  rownames(alltb)<-hto_list$htocols
+  rownames(alltb)<-cur_htocols
   alltb<-t(alltb)
   write.csv(alltb, paste0(name, ".cell.csv"))
   
-  png(paste0(name, ".demulti1.png"), width=3300, height=2000, res=300)
+  width=3300
+  height=3000
+
+  png(paste0(name, ".demulti1.png"), width=width, height=height, res=300)
   print(hto_list$g1)
   dev.off()
 
-  png(paste0(name, ".demulti2.png"), width=3300, height=2000, res=300)
+  png(paste0(name, ".demulti2.png"), width=width, height=height, res=300)
   print(hto_list$g2)
   dev.off()
   
@@ -131,18 +152,42 @@ process_sample<-function(root_dir, sample_tags, name){
     Idents(subobj)<-col
     markers<-FindAllMarkers(subobj, pseudocount.use = FALSE,only.pos = TRUE)
     markers<-markers[!(markers$cluster %in% c("Negative", "Multiplet")),]
-    markers<-markers[order(markers$gene),c("gene", "avg_log2FC"), drop=F]
-    rownames(markers)<-markers$gene
+    markers<-markers[order(markers$avg_log2FC, decreasing=TRUE),c("cluster", "gene", "avg_log2FC"), drop=F]
+    markers<-markers[!duplicated(markers$cluster),,drop=F]
+    markers<-markers[order(markers$cluster),]
+    rownames(markers)<-markers$cluster
     markers<-markers[,"avg_log2FC", drop=F]
-    colnames(markers)=col
     if(is.null(alltb)){
       alltb<-markers
     }else{
-      alltb<-cbind(alltb, markers)
+      alltb<-cbind(alltb, markers[rownames(alltb),])
     }
   }
+  colnames(alltb)<-hto_list$htocols
   write.csv(alltb, paste0(name, ".de.csv"))
   
+  if(grepl("batch", name)){
+    ari_list=list()
+    col=hto_list$htocols[1]
+    for(col in hto_list$htocols){
+      ari=adjustedRandIndex(meta[,col], meta[,"genetic_HTO"])
+      ari_list[[col]] = ari
+    }
+    ari_df<-t(data.frame(ari_list))
+    colnames(ari_df)<-"ari"
+    write.csv(ari_df, paste0(name, ".ari.csv"))
+
+    fscore_list=list()
+    col=hto_list$htocols[1]
+    for(col in hto_list$htocols){
+      fscore=calculate_fscore(meta[,"genetic_HTO"], meta[,col])
+      fscore_list[[col]] = fscore
+    }
+    fscore_df<-t(data.frame(fscore_list))
+    colnames(fscore_df)<-"Fscore"
+    write.csv(fscore_df, paste0(name, ".fscore.csv"))
+  }
+
   if(name == "hto12"){
     hto12_combined_obj_rds<-paste0(root_dir, "/hto12/hto12.combined.rds")
     expobj<-readRDS(hto12_combined_obj_rds)
@@ -177,7 +222,7 @@ process_sample<-function(root_dir, sample_tags, name){
       glist[[col]] = DimPlot(expobj, reduction = "umap", group.by=newcol) + ggtitle(htonames[col])
     }
     g1=get_plot(glist)
-    png("hto12.exp_validation.all.png", width=3300, height=2000, res=300)
+    png("hto12.exp_validation.all.png", width=width, height=height, res=300)
     print(g1)
     dev.off()
 
@@ -194,7 +239,7 @@ process_sample<-function(root_dir, sample_tags, name){
       }
       g1=get_plot(glist, nolegend=TRUE) + plot_annotation(title=ct, theme = theme(plot.title = element_text(size = 20, hjust = 0.5)))
 
-      png(paste0("hto12.exp_validation.", ct, ".png"), width=3000, height=2000, res=300)
+      png(paste0("hto12.exp_validation.", ct, ".png"), width=3000, height=height, res=300)
       print(g1)
       dev.off()
     }
@@ -204,7 +249,3 @@ process_sample<-function(root_dir, sample_tags, name){
 for(name in samples){
   process_sample(root_dir, sample_tags, name)
 }
-
-setwd(root_dir)
-file.copy("/home/shengq2/program/scDemultiplex_analysis/20230304_04_check_result.rmd", getwd(), overwrite=TRUE)
-rmarkdown::render("20230304_04_check_result.rmd")

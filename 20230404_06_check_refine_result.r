@@ -27,8 +27,8 @@ get_plot<-function(glist1, nolegend=FALSE){
   return(g1)
 }
 
-refine_cols<-c("scDemultiplex_full", paste0(c("HTODemux", "MULTIseqDemux", "GMM_Demux", "BFF_raw", "BFF_cluster"), "_scDemultiplex"))
-refine_names<-c("scDemultiplex", "HTODemux", "MULTIseqDemux", "GMM-Demux", "BFF_raw", "BFF_cluster")
+refine_cols<-c("scDemultiplex_full", paste0(c("HTODemux", "MULTIseqDemux", "GMM_Demux", "BFF_raw", "BFF_cluster", "demuxmix"), "_scDemultiplex"))
+refine_names<-c("scDemultiplex", "HTODemux", "MULTIseqDemux", "GMM-Demux", "BFF_raw", "BFF_cluster", "demuxmix")
 names(refine_names)<-refine_cols
 
 prepare_sample<-function(root_dir, sample_tags, name){
@@ -81,6 +81,8 @@ name="hto12"
 process_sample<-function(root_dir, sample_tags, name){
   setwd(file.path(root_dir, name, "scDemultiplex_refine"))
 
+  height=3000
+
   cat("\n\n##", name, "\n\n")
   hto_list<-prepare_sample(root_dir, sample_tags, name)
   obj<-hto_list$htos
@@ -103,11 +105,11 @@ process_sample<-function(root_dir, sample_tags, name){
   alltb<-t(alltb)
   write.csv(alltb, paste0(name, ".cell.csv"))
   
-  png(paste0(name, ".demulti1.png"), width=3300, height=2000, res=300)
+  png(paste0(name, ".demulti1.png"), width=3300, height=height, res=300)
   print(hto_list$g1)
   dev.off()
 
-  png(paste0(name, ".demulti2.png"), width=3300, height=2000, res=300)
+  png(paste0(name, ".demulti2.png"), width=3300, height=height, res=300)
   print(hto_list$g2)
   dev.off()
   
@@ -166,7 +168,7 @@ process_sample<-function(root_dir, sample_tags, name){
       glist[[col]] = DimPlot(expobj, reduction = "umap", group.by=newcol) + ggtitle(refine_names[col])
     }
     g1=get_plot(glist)
-    png("hto12.exp_validation.all.png", width=3300, height=2000, res=300)
+    png("hto12.exp_validation.all.png", width=3300, height=height, res=300)
     print(g1)
     dev.off()
 
@@ -183,7 +185,7 @@ process_sample<-function(root_dir, sample_tags, name){
       }
       g1=get_plot(glist, nolegend=TRUE) + plot_annotation(title=ct, theme = theme(plot.title = element_text(size = 20, hjust = 0.5)))
 
-      png(paste0("hto12.exp_validation.", ct, ".png"), width=3000, height=2000, res=300)
+      png(paste0("hto12.exp_validation.", ct, ".png"), width=3000, height=height, res=300)
       print(g1)
       dev.off()
     }
