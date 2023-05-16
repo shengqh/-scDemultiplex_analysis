@@ -29,6 +29,7 @@ sample_tags = list(
 )
 
 htonames<-c(
+  "scDemultiplex_cutoff"="scDemultiplex_cutoff", 
   "scDemultiplex"="scDemultiplex", 
   "HTODemux"="HTODemux", 
   "MULTIseqDemux"="MULTIseqDemux", 

@@ -208,10 +208,10 @@ do_scDemultiplex<-function(root_dir, cur_sample, p.cut=0.001){
 
     tic(paste0("starting ", cur_sample, " cutoff ...\n"))
     cat("  scDemultiplex_cutoff ...\n")
-    obj<-demulti_cutoff(obj, output_prefix, cutoff_startval = 0, mc.cores=ntags)
+    obj<-demulti_cutoff(obj, output_prefix=output_prefix, cutoff_startval = 0, mc.cores=ntags)
     toc1=toc()
     cat("  scDemultiplex_full ...\n")
-    obj<-demulti_refine(obj, p.cut, refine_negative_doublet_only=FALSE, mc.cores=ntags)
+    obj<-demulti_refine(obj, output_prefix=output_prefix, p.cut=p.cut, refine_negative_doublet_only=FALSE, mc.cores=ntags)
     obj$scDemultiplex_full=obj$scDemultiplex
     obj$scDemultiplex_full.global=obj$scDemultiplex.global
     toc3=toc()
