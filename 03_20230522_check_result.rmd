@@ -1,5 +1,5 @@
 ---
-title: "scDemultiplex Refinement Report"
+title: "HTO Report"
 author: "Quanhu Sheng"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -38,24 +38,23 @@ theme_bw3 <- function () {
 
 #https://stackoverflow.com/questions/74522672/kable-highlighting-the-largest-value-in-each-row-r-knitr
 print_highlight_table_by_row <- function(csv_file){
-  x <- read.csv(csv_file)
+  x <- read.csv(csv_file, row.names=1)
   
   max_values <- x |>
     mutate(across(where(is.numeric), round, 3)) |>
-    select(-X) |>
     purrr::pmap(pmax, na.rm = TRUE) |>
     as.numeric() |>
     na.omit()
   
   tbl <- x |>
     mutate(across(where(is.numeric), round, 3)) |>
-    mutate(across(-X, ~ if_else(.x == max_values[row_number()],
+    mutate(across(where(is.numeric), ~ if_else(.x == max_values[row_number()],
                                 cell_spec(.x,
                                           format = "html",
                                           color = "red", bold = TRUE
                                 ), as.character(.x)
     ))) |>
-    mutate(across(everything(), ~ ifelse(.x == "NaN", "", .))) |>
+    mutate(across(where(is.numeric), ~ ifelse(.x == "NaN", "", .))) |>
     kable(escape = FALSE) |>
     kable_classic(
       full_width = T,
@@ -66,27 +65,30 @@ print_highlight_table_by_row <- function(csv_file){
 }
 
 print_highlight_table_by_column <- function(csv_file){
-  x <- read.csv(csv_file)
-
-  max_values <- x |> 
-    mutate(across(where(is.numeric), round, 3)) |> 
-    summarise(across(-X, max, na.rm = TRUE)) |> as.vector() |> unname()
+  x <- read.csv(csv_file, row.names=1)
+  x <- x |> mutate(across(where(is.numeric), round, 4))
   
+  top2 = apply(x, 2, function(x){
+    sort(x, decreasing = T)[1:2]
+  })
+  first = top2[1,]
+  second = top2[2,]
+
   tbl <- x |> 
-    mutate(across(where(is.numeric), round, 3)) |> 
-    mutate(across(-X, ~if_else(row_number() %in% which(.x %in% max_values),
-                                   cell_spec(.x,format =  "html",
-                                             color = "red", bold = TRUE), as.character(.x)))) |> 
+    mutate(across(where(is.numeric), ~if_else(.x == first[cur_column()],
+                               cell_spec(.x,format =  "html",color = "red", bold = TRUE), 
+                               if_else(as.character(.x) == second[cur_column()],
+                                       cell_spec(.x,format =  "html",color = "blue", bold = TRUE), 
+                                       as.character(.x))))) |> 
     kable(escape = FALSE) |> 
     kable_classic(full_width = T, 
                   html_font = "Cambria", 
                   font_size = 20)
-  
   print(tbl)
 }
 
 print_table <- function(csv_file){
-  x <- read.csv(csv_file)
+  x <- read.csv(csv_file, row.names=1)
 
   tbl <- x %>% 
     kable(escape = FALSE) %>%
@@ -113,23 +115,65 @@ getFigure<-function(filepath){
   return(paste0("```{r,echo=FALSE,results='asis'}\ninclude_graphics('", filepath, "')\n```\n\n"))
 }
 
+source("/home/shengq2/program/scDemultiplex_analysis/common.r")
+knitr::opts_knit$set(root.dir = root_dir)
+```
+
+# Summary
+
+## Adjusted Rand Index
+
+```{r, echo=FALSE, results="asis"}
+print_highlight_table_by_column(file.path(root_dir, "ari.csv"))
+```
+## F Score
+
+```{r, echo=FALSE, results="asis"}
+print_highlight_table_by_column(file.path(root_dir, "fscore.csv"))
 ```
 
 ```{r, echo=FALSE}
-source("/home/shengq2/program/scDemultiplex_analysis/common.r")
-
-#htocols<-c("scDemultiplex", "HTODemux", "MULTIseqDemux", "GMM_demux", "bff_raw", "bff_cluster")
-names=samples
-name=names[1]
-
 resFile<-"sub.Rmd"
-figureRmd<-function(names){
+figureRmd<-function(samples){
   result<-""
-  name = names[1]
-  for(name in names){
-    prefix = file.path(root_dir, name, "scDemultiplex_refine", name)
+  name = samples[1]
+  for(name in samples){
+    prefix = file.path(root_dir, name, name)
     
     result<-paste0(result, paste0("\n\n# ", name, "\n\n"))
+
+    result<-paste0(result, paste0("\n\n## Number of cells\n\n"))
+
+    result<-paste0(result, getTable(paste0(prefix, ".ncell.csv")))
+    
+    export_emres_file = TRUE
+    for(scDemultiplex.p.cut in scDemultiplex.p.cuts){
+      scDemultiplex_folder = get_scDemultiplex_folder(root_dir, name, scDemultiplex.p.cut)
+      cutoff_list = readRDS(paste0(scDemultiplex_folder, "/", name, ".HTO.cutoff_list.rds"))
+      emres = NULL
+      for(hto_name in sort(names(cutoff_list))){
+        cur_em<-readRDS(paste0(scDemultiplex_folder, "/", name, ".HTO_", hto_name, ".em.rds"))
+        cur_param<-data.frame(cur_em$param)
+        colnames(cur_param)<-hto_name
+        if(is.null(emres)){
+          emres = cur_param
+        }else{
+          emres <- cbind(emres, cur_param[rownames(emres),,drop=F])
+        }
+      }
+      emres_file = paste0(scDemultiplex_folder, "/", name, ".scDemultplex.em.csv")
+      write.csv(t(emres), emres_file)
+
+      if(export_emres_file){
+        result<-paste0(result, paste0("\n\n## scDemultiplex normal distribution estimation\n\n"))
+        result<-paste0(result, getTable(emres_file))
+        export_emres_file=FALSE
+      }
+      
+      result<-paste0(result, paste0("\n\n## scDemultiplex pvalue ", scDemultiplex.p.cut, " iteration\n\n"))
+      iter_file = paste0(scDemultiplex_folder, "/", name, ".HTO.iteration.csv")
+      result<-paste0(result, getTable(iter_file))
+    }
 
     result<-paste0(result, paste0("\n\n## Demultiplex result\n\n"))
 
@@ -138,30 +182,10 @@ figureRmd<-function(names){
     result<-paste0(result, getFigure(paste0(prefix, ".demulti1.png")))
 
     result<-paste0(result, getFigure(paste0(prefix, ".demulti2.png")))
-
-    result<-paste0(result, "\n\n## DE analysis\n\n")
-    
-    result<-paste0(result, getTableRow(paste0(prefix, ".de.csv")))
-
-    if(name == "hto12"){
-      result<-paste0(result, paste0("\n\n## AdjustRandIndex\n\n"))
-
-      result<-paste0(result, getTableColumn(paste0(prefix, ".ari.csv")))
-
-      result<-paste0(result, paste0("\n\n## In gene expression UMAP\n\n"))
-      
-      result<-paste0(result, getFigure(paste0(prefix, ".exp_validation.all.png")))
-
-      cts<-c("HEK", "K562", "KG1", "THP1", "Negative", "Multiplet")
-      for(ct in cts){
-        result<-paste0(result, paste0("\n\n### ", ct, "\n\n"))
-        result<-paste0(result, getFigure(paste0(prefix, ".exp_validation.", ct, ".png")))
-      }
-    }
   }
   return(result)
 }
-cat(figureRmd(names), file=resFile)
+cat(figureRmd(samples), file=resFile)
 
 ```
 

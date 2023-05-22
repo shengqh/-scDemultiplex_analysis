@@ -1,41 +1,55 @@
-library(scDemultiplex)
 library(zoo)
 library("R.utils")
 library(reshape2)
 library(Matrix)
 library(data.table)
-library(Seurat)
-library(demuxmix)
 library(tictoc)
 library(dplyr)
 
-root_dir="/nobackup/h_cqs/collaboration/20230301_scrna_hto/"
+load_install<-function(library_name, library_sources=library_name){
+  if(!require(library_name, character.only = T)){
+    BiocManager::install(library_sources)
+  }
+  library(library_name, character.only = T)
+}
+
+load_install("Seurat")
+load_install("demuxmix")
+load_install("aricode")
+load_install("cellhashR", 'BimberLab/cellhashR')
+load_install("scDemultiplex", c('shengqh/cutoff', 'shengqh/scDemultiplex'))
+
+root_dir="/nobackup/h_cqs/collaboration/20230522_scrna_hto/"
 setwd(root_dir)
 
-#samples = c("hto12", "pbmc", "batch1", "batch2", "batch3")
+scDemultiplex.p.cuts = c(0.001)
+names(scDemultiplex.p.cuts) = c("scDemultiplex")
+
 samples = c(
-  "hto12", 
-  "pbmc", 
-  "batch1", 
-  "batch2", 
-  "batch3")
+  "batch1_c1", 
+  "batch1_c2", 
+  "batch2_c1",
+  "batch2_c2",
+  "batch3_c1",
+  "batch3_c2"
+  )
 
 sample_tags = list(
-  "hto12" = "HEK_A,HEK_B,HEK_C,K562_A,K562_B,K562_C,KG1_A,KG1_B,KG1_C,THP1_A,THP1_B,THP1_C",
-  "pbmc" = "HTO_A,HTO_B,HTO_C,HTO_D,HTO_E,HTO_F,HTO_G,HTO_H",
-  "batch1" = "Human-HTO-1,Human-HTO-2,Human-HTO-3,Human-HTO-4,Human-HTO-5,Human-HTO-6,Human-HTO-7,Human-HTO-8",
-  "batch2" = "Human-HTO-6,Human-HTO-7,Human-HTO-9,Human-HTO-10,Human-HTO-12,Human-HTO-13,Human-HTO-14,Human-HTO-15",
-  "batch3" = "Human-HTO-6,Human-HTO-7,Human-HTO-9,Human-HTO-10,Human-HTO-12,Human-HTO-13,Human-HTO-14,Human-HTO-15"
+  "batch1_c1" = "Human-HTO-1,Human-HTO-2,Human-HTO-3,Human-HTO-4,Human-HTO-5,Human-HTO-6,Human-HTO-7,Human-HTO-8",
+  "batch1_c2" = "Human-HTO-1,Human-HTO-2,Human-HTO-3,Human-HTO-4,Human-HTO-5,Human-HTO-6,Human-HTO-7,Human-HTO-8",
+  "batch2_c1" = "Human-HTO-6,Human-HTO-7,Human-HTO-9,Human-HTO-10,Human-HTO-12,Human-HTO-13,Human-HTO-14,Human-HTO-15",
+  "batch2_c2" = "Human-HTO-6,Human-HTO-7,Human-HTO-9,Human-HTO-10,Human-HTO-12,Human-HTO-13,Human-HTO-14,Human-HTO-15",
+  "batch3_c1" = "Human-HTO-6,Human-HTO-7,Human-HTO-9,Human-HTO-10,Human-HTO-12,Human-HTO-13,Human-HTO-14,Human-HTO-15",
+  "batch3_c2" = "Human-HTO-6,Human-HTO-7,Human-HTO-9,Human-HTO-10,Human-HTO-12,Human-HTO-13,Human-HTO-14,Human-HTO-15"
 )
 
 htonames<-c(
-  "scDemultiplex_cutoff"="scDemultiplex_cutoff", 
   "scDemultiplex"="scDemultiplex", 
   "HTODemux"="HTODemux", 
   "MULTIseqDemux"="MULTIseqDemux", 
   "GMM_Demux"="GMM-Demux", 
   "BFF_raw"="BFF_raw", 
-  #"BFF_cluster"="BFF_cluster", 
+  "BFF_cluster"="BFF_cluster", 
   "demuxmix"="demuxmix", 
   "hashedDrops"="hashedDrops")
 htocols=names(htonames)
@@ -72,11 +86,15 @@ calculate_fscore<-function(genetic_HTO, calls){
   calls = as.character(calls)
 
   htos = unique(genetic_HTO)
-  htos = htos[!(htos %in% c("Negative", "Doublet", "Multiplex"))]
-  
+  htos = htos[!(htos %in% c("Negative", "Doublet", "Multiplet"))]
+
   fscores = unlist(lapply(htos, function(HTO){
     calculate_fscore_HTO(HTO, genetic_HTO, calls)
   }))
 
   return(mean(fscores))
+}
+
+get_scDemultiplex_folder<-function(root_dir, cur_sample, p.cut){
+  return(paste0(root_dir, cur_sample, "/scDemultiplex.", p.cut))
 }

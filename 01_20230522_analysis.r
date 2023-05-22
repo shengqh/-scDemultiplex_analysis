@@ -4,6 +4,7 @@ library(cellhashR)
 
 sample_map = list(
   "hto12"=list("HTO"="hto12_hto_mtx.rds", "RNA"="hto12_umi_mtx.rds"),
+  "cellhashR_pbmc"=list("HTO"="GSM2895283_Hashtag-HTO-count.csv.gz"), #since we have ground truth, we don't filter cells by gene expression data
   "pbmc"=list("HTO"="pbmc_hto_mtx.rds", "RNA"="pbmc_umi_mtx.rds")
 )
 
@@ -32,12 +33,22 @@ prepare_data<-function(root_dir, sample_map, cur_sample) {
 
     hto<-hto[!(rownames(hto) %in% ignored_tags), ]
     rownames(hto)<-gsub("-.+", "", rownames(hto))
+    
+    if(cur_sample == "cellhashR_pbmc"){
+      genetic_HTO = read.csv(paste0(cur_sample, ".genetic_HTO.csv"))
+      hto = hto[,genetic_HTO$cell]
+    }
     saveRDS(hto, hto_file)
 
     if(!is.null(exp_mtx_file)){    
       exp=data.frame(fread(exp_mtx_file), row.names=1)
       if(all(grepl("-",rownames(exp)))){
         exp=data.frame(t(exp), check.names = F)
+      }
+      if(cur_sample == "cellhashR_pbmc"){
+        genetic_HTO = read.csv(paste0(cur_sample, ".genetic_HTO.csv"))
+        #keep ground truch cells only
+        exp = exp[,genetic_HTO$cell]
       }
       saveRDS(exp, exp_file)
     }
@@ -56,7 +67,7 @@ prepare_data<-function(root_dir, sample_map, cur_sample) {
     print(paste0("common_cells = ", length(common_cells)))
     exp=exp[,common_cells]
     
-    hto.exp <- CreateSeuratObject(counts = exp, min.features = 300)
+    hto.exp <- CreateSeuratObject(counts = exp, min.features = 200)
     cells.valid<-colnames(hto.exp)
     hto<-hto[!(rownames(hto) %in% ignored_tags), cells.valid]
     
@@ -75,6 +86,7 @@ prepare_data<-function(root_dir, sample_map, cur_sample) {
     hto.exp[["HTO"]] <- CreateAssayObject(counts = hto)
     saveRDS(hto.exp, paste0(cur_sample, ".combined.rds"))
   }
+  
   counts=as.sparse(hto)
   
   save_to_matrix(counts=counts, target_folder="data")
@@ -83,7 +95,14 @@ prepare_data<-function(root_dir, sample_map, cur_sample) {
   saveRDS(counts, rds_file)
   
   obj <- scDemultiplex:::read_hto(rds_file)
+  
+  if(cur_sample == "cellhashR_pbmc"){
+    genetic_HTO = read.csv(paste0(cur_sample, ".genetic_HTO.csv"), row.names=1)
+    obj$genetic_HTO = unlist(genetic_HTO[colnames(obj), "genetic_HTO"])
+  }
+
   obj<-hto_umap(obj)
+  obj<-RunTSNE(obj, dims = 1:nrow(obj), perplexity = 100, check_duplicates = FALSE, verbose = FALSE)
   saveRDS(obj, paste0(cur_sample, ".obj.rds"))
 }
 
@@ -129,6 +148,8 @@ do_bff_raw<-function(root_dir, cur_sample) {
 }
 
 do_bff_cluster<-function(root_dir, cur_sample) {
+  #if failed by thread issue, install preprocessCore manually
+  #https://github.com/Bioconductor/bioconductor_docker/issues/22
   sample_folder=paste0(root_dir, cur_sample)
   setwd(sample_folder)
   
@@ -153,21 +174,24 @@ do_bff_cluster<-function(root_dir, cur_sample) {
                                               doHeatmap = FALSE,
                                               bff_cluster.min_average_reads = 0)  
     toc1=toc()
-    
-    rownames(bff_calls)<-bff_calls$cellbarcode
-    bff_calls<-bff_calls[colnames(obj),]
-    
-    stopifnot(all(colnames(obj) == bff_calls$cellbarcode))
-    
-    obj$bff_cluster <- bff_calls$bff_cluster
-    obj$bff_cluster.global <- as.character(bff_calls$bff_cluster)
-    obj$bff_cluster.global[!(obj$bff_cluster.global %in% c("Negative", "Doublet"))] <- "Singlet"
-    
-    saveRDS(list("bff_cluster"=toc1), paste0(cur_sample, ".bff_cluster.tictoc.rds"))
-    
-    obj<-hto_plot(obj, paste0(cur_sample, ".bff_cluster"), group.by="bff_cluster")
-    
-    saveRDS(obj, paste0(cur_sample, ".bff_cluster.rds"))
+    if(!is.null(bff_calls)){
+      rownames(bff_calls)<-bff_calls$cellbarcode
+      bff_calls<-bff_calls[colnames(obj),]
+      
+      stopifnot(all(colnames(obj) == bff_calls$cellbarcode))
+      
+      obj$bff_cluster <- bff_calls$bff_cluster
+      obj$bff_cluster.global <- as.character(bff_calls$bff_cluster)
+      obj$bff_cluster.global[!(obj$bff_cluster.global %in% c("Negative", "Doublet"))] <- "Singlet"
+      
+      saveRDS(list("bff_cluster"=toc1), paste0(cur_sample, ".bff_cluster.tictoc.rds"))
+      
+      obj<-hto_plot(obj, paste0(cur_sample, ".bff_cluster"), group.by="bff_cluster")
+      
+      saveRDS(obj, paste0(cur_sample, ".bff_cluster.rds"))
+    }else{
+      warning('bff_cluster faild')
+    }
   }
 }
 
@@ -184,48 +208,46 @@ do_GMMDemux<-function(root_dir, sample_tags, cur_sample){
   }
 }
 
-do_scDemultiplex<-function(root_dir, cur_sample, p.cut=0.001){
-  sample_folder=paste0(root_dir, cur_sample)
-  setwd(sample_folder)
-  
-  final_file=paste0(cur_sample, ".scDemultiplex.", p.cut, ".rds")
-  final_rds=paste0( "scDemultiplex/", final_file)
-  if(!file.exists(final_rds)){
-    cat("scDemultiplex ...\n")
-
-    rds_file=paste0(cur_sample, ".obj.rds")
-    obj=readRDS(rds_file)
-
-    ntags = nrow(obj)
-
-    result_folder=paste0(sample_folder, "/scDemultiplex")
+do_scDemultiplex<-function(root_dir, cur_sample, p.cuts=0.001){
+  for(p.cut in p.cuts){
+    result_folder = get_scDemultiplex_folder(root_dir, cur_sample, p.cut)
     if(!dir.exists(result_folder)){
       dir.create(result_folder)
     }
     setwd(result_folder)
-    
-    output_prefix<-paste0(cur_sample, ".HTO")
-
-    tic(paste0("starting ", cur_sample, " cutoff ...\n"))
-    cat("  scDemultiplex_cutoff ...\n")
-    obj<-demulti_cutoff(obj, output_prefix=output_prefix, cutoff_startval = 0, mc.cores=ntags)
-    toc1=toc()
-    cat("  scDemultiplex_full ...\n")
-    obj<-demulti_refine(obj, output_prefix=output_prefix, p.cut=p.cut, refine_negative_doublet_only=FALSE, mc.cores=ntags)
-    obj$scDemultiplex_full=obj$scDemultiplex
-    obj$scDemultiplex_full.global=obj$scDemultiplex.global
-    toc3=toc()
-    # cat("  scDemultiplex_negative_doublet_only ...\n")
-    # obj<-demulti_refine(obj, p.cut, refine_negative_doublet_only=TRUE, mc.cores=ntags)
-    # toc2=toc()
-
-    saveRDS(list("cutoff"=toc1, "full"=toc3), paste0(cur_sample, ".scDemultiplex.tictoc.rds"))
-
-    obj<-hto_plot(obj, paste0(output_prefix, ".cutoff"), group.by="scDemultiplex_cutoff")
-    obj<-hto_plot(obj, paste0(output_prefix, ".refine_p", p.cut), group.by="scDemultiplex")
-    obj<-hto_plot(obj, paste0(output_prefix, ".full_p", p.cut), group.by="scDemultiplex_full")
-
-    saveRDS(obj, final_file)
+  
+    final_rds=paste0(cur_sample, ".scDemultiplex.rds")
+    if(!file.exists(final_rds)){
+      cat("scDemultiplex", p.cut, "...\n")
+  
+      rds_file=paste0("../", cur_sample, ".obj.rds")
+      obj=readRDS(rds_file)
+  
+      ntags = nrow(obj)
+      
+      output_prefix<-paste0(cur_sample, ".HTO")
+  
+      tic(paste0("starting ", cur_sample, " cutoff ...\n"))
+      cat("  scDemultiplex_cutoff ...\n")
+      obj<-demulti_cutoff(obj, output_prefix=output_prefix, cutoff_startval = 0, mc.cores=ntags)
+      toc1=toc()
+      cat("  scDemultiplex_full ...\n")
+      obj<-demulti_refine(obj, output_prefix=output_prefix, p.cut=p.cut, refine_negative_doublet_only=FALSE, mc.cores=ntags)
+      obj$scDemultiplex_full=obj$scDemultiplex
+      obj$scDemultiplex_full.global=obj$scDemultiplex.global
+      toc3=toc()
+      # cat("  scDemultiplex_negative_doublet_only ...\n")
+      # obj<-demulti_refine(obj, p.cut, refine_negative_doublet_only=TRUE, mc.cores=ntags)
+      # toc2=toc()
+  
+      saveRDS(list("cutoff"=toc1, "full"=toc3), paste0(cur_sample, ".scDemultiplex.tictoc.rds"))
+  
+      obj<-hto_plot(obj, paste0(output_prefix, ".cutoff"), group.by="scDemultiplex_cutoff")
+      obj<-hto_plot(obj, paste0(output_prefix, ".refine_p"), group.by="scDemultiplex")
+      obj<-hto_plot(obj, paste0(output_prefix, ".full_p"), group.by="scDemultiplex_full")
+  
+      saveRDS(obj, final_rds)
+    }
   }
 }
 
@@ -367,7 +389,7 @@ do_hashedDrops<-function(root_dir, cur_sample){
   }
 }
 
-do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample){
+do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample, scDemultiplex.p.cuts){
   obj_file = paste0(root_dir, "/", cur_sample, "/", cur_sample, ".obj.rds")
   if(!file.exists(obj_file)){
     cat("prepare_data ...\n")
@@ -380,11 +402,11 @@ do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample){
     do_bff_raw(root_dir, cur_sample)
   }
 
-  # bff_cluster_file = paste0(root_dir, "/", cur_sample, "/bff_cluster/", cur_sample, ".bff_cluster.rds")
-  # if(!file.exists(bff_cluster_file)){
-  #   cat("bff_cluster ...\n")
-  #   do_bff_cluster(root_dir, cur_sample)
-  # }
+  bff_cluster_file = paste0(root_dir, "/", cur_sample, "/bff_cluster/", cur_sample, ".bff_cluster.rds")
+  if(!file.exists(bff_cluster_file)){
+    cat("bff_cluster ...\n")
+    do_bff_cluster(root_dir, cur_sample)
+  }
 
   gmm_file = paste0(root_dir, "/", cur_sample, "/GMM-demux/GMM_full.csv")
   if(!file.exists(gmm_file)){
@@ -392,7 +414,7 @@ do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample){
     do_GMMDemux(root_dir, sample_tags, cur_sample)
   }
 
-  do_scDemultiplex(root_dir, cur_sample, p.cut=0.00001)
+  do_scDemultiplex(root_dir, cur_sample, p.cuts=scDemultiplex.p.cuts)
 
   htodemux_file = paste0(root_dir, "/", cur_sample, "/HTODemux/", cur_sample, ".HTODemux.rds")
   if(!file.exists(htodemux_file)){
@@ -424,5 +446,5 @@ do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample){
 cur_sample = "hto12"
 for(cur_sample in samples){
   cat("processing", cur_sample, "\n")
-  do_analysis(root_dir, sample_map, sample_tags, cur_sample)
+  do_analysis(root_dir, sample_map, sample_tags, cur_sample, scDemultiplex.p.cuts)
 }

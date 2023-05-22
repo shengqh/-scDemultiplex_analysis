@@ -1,0 +1,69 @@
+---
+title: "HTO Report"
+author: "Quanhu Sheng"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  rmdformats::readthedown:
+    toc_depth: 3
+    code_folding: hide
+---
+
+```{r setup, include = FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo=FALSE, include=TRUE, warning=FALSE, message=FALSE)
+source('/home/shengq2/program/scDemultiplex_analysis/common.r')
+```
+
+```{css, echo=FALSE}
+#content{
+    max-width:1920px;
+}
+```
+
+```{r,eval=FALSE,echo=FALSE}
+rmarkdown::render(input="/home/shengq2/program/scDemultiplex_analysis/04_20230519.scDemultiplex.iteration.rmd",
+                  output_dir = "/nobackup/h_cqs/collaboration/20230522_scrna_hto",
+                  output_file="20230522.scDemultiplex.iteration.html")
+```
+
+
+```{r results='asis'}
+batch="batch2_c1"
+for(batch in samples){
+  batch_dir = paste0(root_dir, batch)
+  prefix=paste0(batch_dir, "/scDemultiplex.0.001/", batch)
+  detail<-read.csv(paste0(prefix, ".HTO.iteration.detail.csv"), row.names=1)
+  
+  ari<-read.csv(paste0(batch_dir, "/", batch, ".ari.csv"), row.names=1)
+  fscore<-read.csv(paste0(batch_dir, "/", batch, ".fscore.csv"), row.names=1)
+
+  cat("# ", batch, "\n\n")
+  xnames = paste0('X', c(0:10))
+  xnames = xnames[xnames %in% colnames(detail)]
+  xi=3
+  for(xi in c(1:(length(xnames)-1))){
+    yi = xi+1
+    xn = xnames[xi]
+    yn = xnames[yi]
+    x_ari = ifelse(xn == 'X0', ari["scDemultiplex_cutoff", 1], ari[xn,1])
+    y_ari = ari[yn,1]
+    x_fscore = ifelse(xn == 'X0', fscore["scDemultiplex_cutoff", 1], fscore[xn,1])
+    y_fscore = fscore[yn,1]
+    
+    cat(paste0("## ", xnames[xi], " to ", xnames[yi], "\n"))
+    
+    df<-data.frame("Name"=c(xn, yn), "ARI"=c(x_ari, y_ari), "Fscore"=c(x_fscore, y_fscore))
+    
+    
+    print(kable(df))
+    
+    move_tb = table(detail[,xn], detail[,yn])
+    should_stop = scDemultiplex:::should_stop(detail[,xn], detail[,yn])
+    
+    cat("\nshould stop = ", should_stop, "\n")
+    
+    print(kable(move_tb))
+  }
+}
+
+```

@@ -22,7 +22,7 @@ do_scDemultiplex_refine<-function(root_dir, cur_sample, p.cut=0.001){
   
   col=htocols[6]
   for(col in htocols){
-    if(col == "scDemultiplex") {
+    if(grepl("scDemultiplex", col)) {
       next
     }
     cat("refine", col, "\n")
@@ -37,6 +37,11 @@ do_scDemultiplex_refine<-function(root_dir, cur_sample, p.cut=0.001){
       obj@meta.data[,paste0(newcol, ".global")]=meta[,paste0(newcol, ".global")]
     }else{
       cat("  scDemultiplex refinement of", col, " ...\n")
+      if(!all(rownames(obj) %in% unlist(obj@meta.data[,col]))){
+        print("Not all tags in init result, ignored.")
+        #missing tags in init result, ignored.
+        next;
+      }
       obj<-demulti_refine(obj, p.cut, refine_negative_doublet_only=FALSE, mc.cores=ntags, init_column=col)
       obj@meta.data[,newcol]=obj$scDemultiplex
       obj@meta.data[,paste0(newcol, ".global")]=obj$scDemultiplex.global
