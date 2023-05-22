@@ -169,16 +169,6 @@ process_sample<-function(root_dir, sample_tags, name){
   all_names = hto_list$htocols
   all_names = all_names[all_names != "genetic_HTO"]
 
-  ami_list=list()
-  col=all_names[1]
-  for(col in all_names){
-    ami=AMI(meta[,col], meta[,"genetic_HTO"])
-    ami_list[[col]] = ami
-  }
-  ami_df<-t(data.frame(ami_list))
-  colnames(ami_df)<-"AMI"
-  write.csv(ami_df, paste0(name, ".ami.csv"))
-
   ari_list=list()
   col=all_names[1]
   for(col in all_names){

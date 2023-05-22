@@ -95,11 +95,6 @@ prepare_data<-function(root_dir, sample_map, cur_sample) {
   saveRDS(counts, rds_file)
   
   obj <- scDemultiplex:::read_hto(rds_file)
-  
-  if(cur_sample == "cellhashR_pbmc"){
-    genetic_HTO = read.csv(paste0(cur_sample, ".genetic_HTO.csv"), row.names=1)
-    obj$genetic_HTO = unlist(genetic_HTO[colnames(obj), "genetic_HTO"])
-  }
 
   obj<-hto_umap(obj)
   obj<-RunTSNE(obj, dims = 1:nrow(obj), perplexity = 100, check_duplicates = FALSE, verbose = FALSE)
