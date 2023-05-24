@@ -68,7 +68,8 @@ print_highlight_table_by_column <- function(csv_file){
   x <- read.csv(csv_file, row.names=1)
   x <- x |> mutate(across(where(is.numeric), round, 4))
   
-  top2 = apply(x, 2, function(x){
+  no_genetic_hto<-x[rownames(x) != "genetic_HTO",]
+  top2 = apply(no_genetic_hto, 2, function(x){
     sort(x, decreasing = T)[1:2]
   })
   first = top2[1,]
@@ -177,7 +178,7 @@ figureRmd<-function(samples){
 
     result<-paste0(result, paste0("\n\n## Demultiplex result\n\n"))
 
-    result<-paste0(result, getTableRow(paste0(prefix, ".cell.csv")))
+    result<-paste0(result, getTableColumn(paste0(prefix, ".cell.csv")))
     
     result<-paste0(result, getFigure(paste0(prefix, ".demulti1.png")))
 

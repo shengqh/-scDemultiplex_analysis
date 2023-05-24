@@ -111,13 +111,8 @@ process_sample<-function(root_dir, sample_tags, name){
   if(file.exists(raw_exps_rds)){
     raw_htos = readRDS(paste0(name, "_hto_mtx.rds"))
     raw_exps = readRDS(raw_exps_rds)
-    if(name == "hto12"){
-      common_cells = intersect(rownames(raw_htos), colnames(raw_exps))
-      n_hto = nrow(raw_htos)
-    }else{
-      common_cells = intersect(colnames(raw_htos), colnames(raw_exps))
-      n_hto = ncol(raw_htos)
-    }
+    common_cells = intersect(colnames(raw_htos), colnames(raw_exps))
+    n_hto = ncol(raw_htos)
     n_umi = ncol(raw_exps)
 
     final_cells = colnames(readRDS(paste0(name, ".obj.rds")))
@@ -152,7 +147,7 @@ process_sample<-function(root_dir, sample_tags, name){
     }
   }
   rownames(alltb)<-cur_htocols
-  alltb<-t(alltb)
+  colnames(alltb)<-gsub("Human-", "", colnames(alltb))
   write.csv(alltb, paste0(name, ".cell.csv"))
   
   width=3300
@@ -172,8 +167,7 @@ process_sample<-function(root_dir, sample_tags, name){
   ari_list=list()
   col=all_names[1]
   for(col in all_names){
-    ari=ARI(meta[,col], meta[,"genetic_HTO"])
-    #ari=adjustedRandIndex(meta[,col], meta[,"genetic_HTO"])#equal result as ARI function
+    ari=adjustedRandIndex(meta[,col], meta[,"genetic_HTO"])
     ari_list[[col]] = ari
   }
   ari_df<-t(data.frame(ari_list))
