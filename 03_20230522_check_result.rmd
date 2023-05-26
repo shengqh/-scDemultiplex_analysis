@@ -127,10 +127,17 @@ knitr::opts_knit$set(root.dir = root_dir)
 ```{r, echo=FALSE, results="asis"}
 print_highlight_table_by_column(file.path(root_dir, "ari.csv"))
 ```
+
 ## F Score
 
 ```{r, echo=FALSE, results="asis"}
 print_highlight_table_by_column(file.path(root_dir, "fscore.csv"))
+```
+
+## Speed (in seconds)
+
+```{r, echo=FALSE, results="asis"}
+print_table(file.path(root_dir, "speed.csv"))
 ```
 
 ```{r, echo=FALSE}

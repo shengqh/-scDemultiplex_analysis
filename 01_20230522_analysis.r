@@ -197,9 +197,12 @@ do_GMMDemux<-function(root_dir, sample_tags, cur_sample){
 
   final_rds = paste0( "GMM-demux/GMM_full.csv")
   if(!file.exists(final_rds)){
+    tic(paste0("starting ", cur_sample, "...\n"))
     cmd = paste0("/data/cqs/softwares/conda_py3_10/bin/GMM-demux data ", tags,  " -f GMM-demux -o GMM-demux")
     print(cmd)
     system(cmd)
+    toc1=toc()
+    saveRDS(list("GMM_demux"=toc1), paste0("GMM-demux/", cur_sample, ".GMM-demux.tictoc.rds"))
   }
 }
 
@@ -226,19 +229,17 @@ do_scDemultiplex<-function(root_dir, cur_sample, p.cuts=0.001){
       cat("  scDemultiplex_cutoff ...\n")
       obj<-demulti_cutoff(obj, output_prefix=output_prefix, cutoff_startval = 0, mc.cores=ntags)
       toc1=toc()
-      cat("  scDemultiplex_full ...\n")
+
+      tic(paste0("starting ", cur_sample, " scDemultiplex_full ...\n"))
       obj<-demulti_refine(obj, output_prefix=output_prefix, p.cut=p.cut, refine_negative_doublet_only=FALSE, mc.cores=ntags)
       obj$scDemultiplex_full=obj$scDemultiplex
       obj$scDemultiplex_full.global=obj$scDemultiplex.global
       toc3=toc()
-      # cat("  scDemultiplex_negative_doublet_only ...\n")
-      # obj<-demulti_refine(obj, p.cut, refine_negative_doublet_only=TRUE, mc.cores=ntags)
-      # toc2=toc()
   
       saveRDS(list("cutoff"=toc1, "full"=toc3), paste0(cur_sample, ".scDemultiplex.tictoc.rds"))
   
       obj<-hto_plot(obj, paste0(output_prefix, ".cutoff"), group.by="scDemultiplex_cutoff")
-      obj<-hto_plot(obj, paste0(output_prefix, ".refine_p"), group.by="scDemultiplex")
+      #obj<-hto_plot(obj, paste0(output_prefix, ".refine_p"), group.by="scDemultiplex")
       obj<-hto_plot(obj, paste0(output_prefix, ".full_p"), group.by="scDemultiplex_full")
   
       saveRDS(obj, final_rds)

@@ -5,6 +5,8 @@ library(kableExtra)
 library(dplyr)
 library(mclust)
 library(stringr)
+library(scales)
+library(RColorBrewer)
 
 theme_bw3 <- function() { 
 	theme_bw() +
@@ -37,10 +39,22 @@ get_iteration_colnames<-function(meta){
   }
 }
 
+get_hue_colors<-function(n, random_colors=TRUE, random.seed=20220606){
+  ccolors<-hue_pal()(n)
+  if(random_colors){
+    x <- .Random.seed
+    set.seed(random.seed)
+    ccolors<-sample(ccolors, size=n)
+    .Random.seed <- x
+  }
+  return(ccolors)
+}
+
 get_all_hto_methods<-function(root_dir, name, htocols){
   rds_file=paste0(root_dir, name, "/", name, ".results_obj.rds")
   htos<-readRDS(rds_file)
-  all_htocols = c("genetic_HTO", htocols)
+  #all_htocols = c("genetic_HTO", htocols)
+  all_htocols = htocols
   valid_htocols = all_htocols[all_htocols %in% colnames(htos@meta.data)]
   return(valid_htocols)
 }
@@ -64,46 +78,62 @@ prepare_sample<-function(root_dir, sample_tags, name){
     all_cols = cur_htocols
   }
   
+  levels = c(tag_names, "Negative", "Multiplet")
+  
   #replace all Doublet as Multiplex
   col=all_cols[1]
   for(col in all_cols){
     htos@meta.data[,col]<-as.character(htos@meta.data[,col])
     htos@meta.data[,col][htos@meta.data[,col]=="Doublet"]<-"Multiplet"
-    htos@meta.data[,col]<-factor(htos@meta.data[,col], levels=c(tag_names, "Negative", "Multiplet"))
+    #htos@meta.data[,col]<-factor(htos@meta.data[,col], levels=levels)
   }
 
   meta<-htos@meta.data
 
+  colors = get_hue_colors(length(levels))
+  names(colors) = levels
+  global_colors=c("Singlet"="gray", "Negative"="blue", "Multiplex"="red")
+  
   for(col in cur_htocols){
+    htos@meta.data[,col] = as.character(htos@meta.data[,col])
+    g = DimPlot(htos, reduction="umap", group.by=col) + ggtitle(col) + scale_color_manual(values=colors) + theme(aspect.ratio = 1)
+    if(col == cur_htocols[1]){
+      g=g+theme(legend.position = c(2.8, -2.3))
+    }else{
+      g=g+NoLegend()
+    }
+    glist1[[col]] = g
+    
     newcol.global.name<-gsub("-", "_", paste0(col, ".global"))
-    newcol.global<-as.character(meta[,col])
+    newcol.global<-htos@meta.data[,col]
     newcol.global[!newcol.global %in% c("Negative", "Multiplet")]<-"Singlet"
+    table(newcol.global)
     htos<-AddMetaData(htos, newcol.global, col.name = newcol.global.name)
-
-    glist1[[col]] = DimPlot(htos, reduction="umap", group.by=col) + ggtitle(htonames[col])
     
     celllist<-list()
     celllist$Negative<-colnames(htos)[newcol.global == "Negative"]
     celllist$Multiplex<-colnames(htos)[newcol.global == "Multiplet"]
     
-    g<-DimPlot(htos, reduction="umap", cells.highlight = celllist, group.by=newcol.global.name) + 
+    g<-DimPlot(htos, reduction="umap", cells.highlight = celllist, group.by=newcol.global.name) +
       ggtitle(htonames[col])
-      
-    if("Negative" %in% meta[,col]){
-      g<-g+scale_color_manual(labels=c('Singlet', 'Negative', 'Multiplet'), values =c("gray", "blue", "red"))
+    g$data$highlight=recode(g$data$highlight, Unselected="Singlet")
+    g<-g+scale_color_manual(values=global_colors)
+    if(col == cur_htocols[1]){
+      g=g+theme(legend.position = c(2.8, -2.3))
     }else{
-      g<-g+scale_color_manual(labels=c('Singlet', 'Multiplet'), values =c("gray", "red"))
+      g=g+NoLegend()
     }
+    
     glist2[[newcol.global.name]] = g
   }
   
-  g1<-get_plot(glist1)
-  g2<-get_plot(glist2)
+  g1<-get_plot(glist1, nolegend = TRUE)
+  g2<-get_plot(glist2, nolegend = TRUE)
 
   return(list(htos=htos, htocols=cur_htocols, g1=g1, g2=g2))
 }
 
-name="batch1_c1"
+name="batch2_c1"
 process_sample<-function(root_dir, sample_tags, name){
   setwd(file.path(root_dir, name))
 
@@ -150,7 +180,7 @@ process_sample<-function(root_dir, sample_tags, name){
   colnames(alltb)<-gsub("Human-", "", colnames(alltb))
   write.csv(alltb, paste0(name, ".cell.csv"))
   
-  width=3300
+  width=3000
   height=3000
 
   png(paste0(name, ".demulti1.png"), width=width, height=height, res=300)
