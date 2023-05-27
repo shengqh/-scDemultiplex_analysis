@@ -1,25 +1,30 @@
-library(zoo)
-library("R.utils")
-library(reshape2)
-library(Matrix)
-library(data.table)
-library(tictoc)
-library(dplyr)
-
 load_install<-function(library_name, library_sources=library_name){
   if(!require(library_name, character.only = T)){
-    BiocManager::install(library_sources)
+    BiocManager::install(library_sources, ask=FALSE)
   }
   library(library_name, character.only = T)
 }
 
+load_install("zoo")
+load_install("R.utils")
+load_install("reshape2")
+load_install("Matrix")
+load_install("data.table")
+load_install("dplyr")
+
 load_install("Seurat")
 load_install("demuxmix")
 load_install("aricode")
+load_install("tictoc")
 load_install("cellhashR", 'BimberLab/cellhashR')
 load_install("scDemultiplex", c('shengqh/cutoff', 'shengqh/scDemultiplex'))
 
-root_dir="/nobackup/h_cqs/collaboration/20230522_scrna_hto/"
+is_unix=.Platform$OS.type == "unix"
+if(is_unix) {
+  root_dir="/nobackup/h_cqs/collaboration/20230522_scrna_hto/"
+} else {
+  root_dir="C:/projects/nobackup/h_cqs/collaboration/20230522_scrna_hto/"
+}
 setwd(root_dir)
 
 scDemultiplex.p.cuts = c(0.001)
@@ -43,17 +48,24 @@ sample_tags = list(
   "batch3_c2" = "Human-HTO-6,Human-HTO-7,Human-HTO-9,Human-HTO-10,Human-HTO-12,Human-HTO-13,Human-HTO-14,Human-HTO-15"
 )
 
-htonames<-c(
-  "scDemultiplex"="scDemultiplex", 
-  "HTODemux"="HTODemux", 
-  "MULTIseqDemux"="MULTIseqDemux", 
-  "GMM_Demux"="GMM-Demux", 
-  "BFF_raw"="BFF_raw", 
-  "BFF_cluster"="BFF_cluster", 
-  "demuxmix"="demuxmix", 
-  "hashedDrops"="hashedDrops")
-htocols=names(htonames)
-htonames[["genetic_HTO"]] = "genetic_HTO"
+if(is_unix) {
+  htonames<-c(
+    "scDemultiplex"="scDemultiplex", 
+    "HTODemux"="HTODemux", 
+    "MULTIseqDemux"="MULTIseqDemux", 
+    "GMM_Demux"="GMM-Demux", 
+    "BFF_raw"="BFF_raw", 
+    "BFF_cluster"="BFF_cluster", 
+    "demuxmix"="demuxmix", 
+    "hashedDrops"="hashedDrops")
+  htocols=names(htonames)
+  htonames[["genetic_HTO"]] = "genetic_HTO"
+}else{
+  htonames<-c(
+    "scDemultiplex"="scDemultiplex"
+  )
+  htocols=names(htonames)
+}
 
 save_to_matrix<-function(counts, target_folder) {
   if(!dir.exists(target_folder)){
