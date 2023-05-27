@@ -13,8 +13,8 @@ R -f /home/shengq2/program/scDemultiplex_analysis/02_20230522_combine_results.r
 
 R -f /home/shengq2/program/scDemultiplex_analysis/03_20230522_check_result.r
 
-cp -f /home/shengq2/program/scDemultiplex_analysis/03_20230522_check_result.rmd 20230522_check_result.rmd
-R -e 'rmarkdown::render("20230522_check_result.rmd")'
+cp -f /home/shengq2/program/scDemultiplex_analysis/03_20230522_check_result.rmd 20230526_check_result.rmd
+R -e 'rmarkdown::render("20230526_check_result.rmd")'
 
 cp -f /home/shengq2/program/scDemultiplex_analysis/04_20230522_scDemultiplex_iteration.rmd 20230522_scDemultiplex_iteration.rmd
 R -e 'rmarkdown::render("20230522_scDemultiplex_iteration.rmd")'
