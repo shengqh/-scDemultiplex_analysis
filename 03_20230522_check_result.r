@@ -92,7 +92,7 @@ prepare_sample<-function(root_dir, sample_tags, name){
 
   colors = get_hue_colors(length(levels))
   names(colors) = levels
-  global_colors=c("Singlet"="gray", "Negative"="blue", "Multiplex"="red")
+  global_colors=c("Singlet"="gray", "Negative"="blue", "Multiplet"="red")
   
   for(col in cur_htocols){
     htos@meta.data[,col] = as.character(htos@meta.data[,col])
@@ -112,7 +112,7 @@ prepare_sample<-function(root_dir, sample_tags, name){
     
     celllist<-list()
     celllist$Negative<-colnames(htos)[newcol.global == "Negative"]
-    celllist$Multiplex<-colnames(htos)[newcol.global == "Multiplet"]
+    celllist$Multiplet<-colnames(htos)[newcol.global == "Multiplet"]
     
     g<-DimPlot(htos, reduction="umap", cells.highlight = celllist, group.by=newcol.global.name) +
       ggtitle(htonames[col])
