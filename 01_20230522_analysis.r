@@ -1,4 +1,9 @@
-source('/home/shengq2/program/scDemultiplex_analysis/common.r')
+is_unix=.Platform$OS.type == "unix"
+if(is_unix) {
+  source('/home/shengq2/program/scDemultiplex_analysis/common.r')
+} else {
+  source('C:/Users/sheng/Programs/scDemultiplex_analysis/common.r')
+}
 
 library(cellhashR)
 
@@ -223,8 +228,9 @@ do_scDemultiplex<-function(root_dir, cur_sample, p.cuts=0.001){
   
       ntags = nrow(obj)
       
-      output_prefix<-paste0(cur_sample, ".HTO")
-  
+      #output_prefix<-paste0(cur_sample, ".HTO")
+      output_prefix<-NULL
+      
       tic(paste0("starting ", cur_sample, " cutoff ...\n"))
       cat("  scDemultiplex_cutoff ...\n")
       obj<-demulti_cutoff(obj, output_prefix=output_prefix, cutoff_startval = 0, mc.cores=ntags)
@@ -392,50 +398,52 @@ do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample, scDemultipl
     prepare_data(root_dir, sample_map, cur_sample)
   }
 
-  bff_raw_file = paste0(root_dir, "/", cur_sample, "/bff_raw/", cur_sample, ".bff_raw.rds")
-  if(!file.exists(bff_raw_file)){
-    cat("bff_raw ...\n")
-    do_bff_raw(root_dir, cur_sample)
-  }
+  if(is_unix){
+    bff_raw_file = paste0(root_dir, "/", cur_sample, "/bff_raw/", cur_sample, ".bff_raw.rds")
+    if(!file.exists(bff_raw_file)){
+      cat("bff_raw ...\n")
+      do_bff_raw(root_dir, cur_sample)
+    }
 
-  bff_cluster_file = paste0(root_dir, "/", cur_sample, "/bff_cluster/", cur_sample, ".bff_cluster.rds")
-  if(!file.exists(bff_cluster_file)){
-    cat("bff_cluster ...\n")
-    do_bff_cluster(root_dir, cur_sample)
-  }
+    bff_cluster_file = paste0(root_dir, "/", cur_sample, "/bff_cluster/", cur_sample, ".bff_cluster.rds")
+    if(!file.exists(bff_cluster_file)){
+      cat("bff_cluster ...\n")
+      do_bff_cluster(root_dir, cur_sample)
+    }
 
-  gmm_file = paste0(root_dir, "/", cur_sample, "/GMM-demux/GMM_full.csv")
-  if(!file.exists(gmm_file)){
-    cat("GMM-demux ...\n")
-    do_GMMDemux(root_dir, sample_tags, cur_sample)
+    gmm_file = paste0(root_dir, "/", cur_sample, "/GMM-demux/GMM_full.csv")
+    if(!file.exists(gmm_file)){
+      cat("GMM-demux ...\n")
+      do_GMMDemux(root_dir, sample_tags, cur_sample)
+    }
+
+    htodemux_file = paste0(root_dir, "/", cur_sample, "/HTODemux/", cur_sample, ".HTODemux.rds")
+    if(!file.exists(htodemux_file)){
+      cat("HTODemux ...\n")
+      do_seurat_HTODemux(root_dir, cur_sample)
+    }
+
+    MULTIseqDemux_file = paste0(root_dir, "/", cur_sample, "/MULTIseqDemux/", cur_sample, ".MULTIseqDemux.rds")
+    if(!file.exists(MULTIseqDemux_file)){
+      cat("MULTIseqDemux ...\n")
+      do_seurat_MULTIseqDemux(root_dir, cur_sample)
+    }
+
+    demuxmix_file = paste0(root_dir, "/", cur_sample, "/demuxmix/", cur_sample, ".demuxmix.rds")
+    if(!file.exists(demuxmix_file)){
+      cat("demuxmix ...\n")
+      do_demuxmix(root_dir, cur_sample)
+    }
+
+    hashedDrops_file = paste0(root_dir, "/", cur_sample, "/hashedDrops/", cur_sample, ".hashedDrops.rds")
+    if(!file.exists(hashedDrops_file)){
+      cat("hashedDrops ...\n")
+      do_hashedDrops(root_dir, cur_sample)
+    }
   }
 
   do_scDemultiplex(root_dir, cur_sample, p.cuts=scDemultiplex.p.cuts)
-
-  htodemux_file = paste0(root_dir, "/", cur_sample, "/HTODemux/", cur_sample, ".HTODemux.rds")
-  if(!file.exists(htodemux_file)){
-    cat("HTODemux ...\n")
-    do_seurat_HTODemux(root_dir, cur_sample)
-  }
-
-  MULTIseqDemux_file = paste0(root_dir, "/", cur_sample, "/MULTIseqDemux/", cur_sample, ".MULTIseqDemux.rds")
-  if(!file.exists(MULTIseqDemux_file)){
-    cat("MULTIseqDemux ...\n")
-    do_seurat_MULTIseqDemux(root_dir, cur_sample)
-  }
-
-  demuxmix_file = paste0(root_dir, "/", cur_sample, "/demuxmix/", cur_sample, ".demuxmix.rds")
-  if(!file.exists(demuxmix_file)){
-    cat("demuxmix ...\n")
-    do_demuxmix(root_dir, cur_sample)
-  }
-
-  hashedDrops_file = paste0(root_dir, "/", cur_sample, "/hashedDrops/", cur_sample, ".hashedDrops.rds")
-  if(!file.exists(hashedDrops_file)){
-    cat("hashedDrops ...\n")
-    do_hashedDrops(root_dir, cur_sample)
-  }
-
+  
   cat("done.\n")
 }
 
