@@ -1,9 +1,14 @@
-source('/home/shengq2/program/scDemultiplex_analysis/common.r')
+is_unix=.Platform$OS.type == "unix"
+if(is_unix) {
+  source('/home/shengq2/program/scDemultiplex_analysis/common.r')
+} else {
+  source('C:/Users/sheng/Programs/scDemultiplex_analysis/common.r')
+}
 
 #https://www.biorxiv.org/content/biorxiv/early/2023/01/16/2022.12.20.521313.full.pdf
 #https://github.com/Oshlack/hashtag-demux-paper
 
-data_dir = "/nobackup/h_cqs/collaboration/20230522_scrna_hto/hashtag-demux-paper/data/"
+data_dir = paste0(root_dir, "/hashtag-demux-paper/data/")
 
 #For each of the batches need a list of the HTOs and the associated genetic donors.
 donor_list = list(
