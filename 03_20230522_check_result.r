@@ -17,7 +17,14 @@ theme_bw3 <- function() {
 	)
 }
 
-source("/home/shengq2/program/scDemultiplex_analysis/common.r")
+rm(list=ls()) 
+
+is_unix=.Platform$OS.type == "unix"
+if(is_unix) {
+  source('/home/shengq2/program/scDemultiplex_analysis/common.r')
+} else {
+  source('C:/Users/sheng/Programs/scDemultiplex_analysis/common.r')
+}
 
 get_plot<-function(glist1, nolegend=FALSE){
   if(nolegend){
