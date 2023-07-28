@@ -228,8 +228,8 @@ do_scDemultiplex<-function(root_dir, cur_sample, p.cuts=0.001){
   
       ntags = nrow(obj)
       
-      #output_prefix<-paste0(cur_sample, ".HTO")
-      output_prefix<-NULL
+      output_prefix<-paste0(cur_sample, ".HTO")
+      #output_prefix<-NULL
       
       tic(paste0("starting ", cur_sample, " cutoff ...\n"))
       cat("  scDemultiplex_cutoff ...\n")
@@ -447,7 +447,7 @@ do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample, scDemultipl
   cat("done.\n")
 }
 
-cur_sample = "hto12"
+cur_sample = "pbmc8"
 for(cur_sample in samples){
   cat("processing", cur_sample, "\n")
   do_analysis(root_dir, sample_map, sample_tags, cur_sample, scDemultiplex.p.cuts)
