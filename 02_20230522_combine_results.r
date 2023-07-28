@@ -7,7 +7,7 @@ if(is_unix) {
   source('C:/Users/sheng/Programs/scDemultiplex_analysis/common.r')
 }
 
-speed = data.frame(matrix(ncol = 6, nrow = length(htocols) + 1))
+speed = data.frame(matrix(ncol = length(samples), nrow = length(htocols) + 1))
 colnames(speed)<-samples
 rownames(speed)<-c("scDemultiplex_cutoff", htocols)
 
