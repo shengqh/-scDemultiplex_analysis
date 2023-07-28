@@ -21,9 +21,12 @@ load_install("scDemultiplex", c('shengqh/cutoff', 'shengqh/scDemultiplex'))
 
 is_unix=.Platform$OS.type == "unix"
 if(is_unix) {
-  root_dir="/nobackup/h_cqs/collaboration/20230522_scrna_hto/"
+  root_dir="/nobackup/h_cqs/collaboration/20230725_scrna_hto/"
 } else {
-  root_dir="C:/projects/nobackup/h_cqs/collaboration/20230522_scrna_hto/"
+  root_dir="C:/projects/nobackup/h_cqs/collaboration/20230725_scrna_hto/"
+}
+if(!dir.exists(root_dir)){
+  dir.create(root_dir)
 }
 setwd(root_dir)
 
@@ -31,13 +34,15 @@ scDemultiplex.p.cuts = c(0.001)
 names(scDemultiplex.p.cuts) = c("scDemultiplex")
 
 samples = c(
+  "barnyard",
+  "pbmc8",
   "batch1_c1", 
   "batch1_c2", 
   "batch2_c1",
   "batch2_c2",
   "batch3_c1",
   "batch3_c2"
-  )
+)
 
 sample_tags = list(
   "batch1_c1" = "Human-HTO-1,Human-HTO-2,Human-HTO-3,Human-HTO-4,Human-HTO-5,Human-HTO-6,Human-HTO-7,Human-HTO-8",
@@ -45,7 +50,9 @@ sample_tags = list(
   "batch2_c1" = "Human-HTO-6,Human-HTO-7,Human-HTO-9,Human-HTO-10,Human-HTO-12,Human-HTO-13,Human-HTO-14,Human-HTO-15",
   "batch2_c2" = "Human-HTO-6,Human-HTO-7,Human-HTO-9,Human-HTO-10,Human-HTO-12,Human-HTO-13,Human-HTO-14,Human-HTO-15",
   "batch3_c1" = "Human-HTO-6,Human-HTO-7,Human-HTO-9,Human-HTO-10,Human-HTO-12,Human-HTO-13,Human-HTO-14,Human-HTO-15",
-  "batch3_c2" = "Human-HTO-6,Human-HTO-7,Human-HTO-9,Human-HTO-10,Human-HTO-12,Human-HTO-13,Human-HTO-14,Human-HTO-15"
+  "batch3_c2" = "Human-HTO-6,Human-HTO-7,Human-HTO-9,Human-HTO-10,Human-HTO-12,Human-HTO-13,Human-HTO-14,Human-HTO-15",
+  "barnyard" = "Bar1,Bar2,Bar3,Bar4,Bar5,Bar6,Bar7,Bar8,Bar9,Bar10,Bar11,Bar12",
+  "pbmc8" = "BatchA,BatchB,BatchC,BatchD,BatchE,BatchF,BatchG,BatchH"
 )
 
 if(is_unix) {
@@ -59,7 +66,7 @@ if(is_unix) {
     "demuxmix"="demuxmix", 
     "hashedDrops"="hashedDrops")
   htocols=names(htonames)
-  htonames[["genetic_HTO"]] = "genetic_HTO"
+  htonames[["ground_truth"]] = "ground_truth"
 }else{
   htonames<-c(
     "scDemultiplex"="scDemultiplex"
@@ -85,23 +92,23 @@ save_to_matrix<-function(counts, target_folder) {
   gzip(matrix_file, overwrite=T)
 }
 
-calculate_fscore_HTO<-function(HTO, genetic_HTO, calls){
-  tp <- sum(calls == HTO & genetic_HTO == HTO) #True positive rate
-  fp <- sum(calls == HTO & genetic_HTO != HTO) #False positive rate
-  fn <- sum(calls != HTO & genetic_HTO == HTO) #False negative rate
+calculate_fscore_HTO<-function(HTO, ground_truth, calls){
+  tp <- sum(calls == HTO & ground_truth == HTO) #True positive rate
+  fp <- sum(calls == HTO & ground_truth != HTO) #False positive rate
+  fn <- sum(calls != HTO & ground_truth == HTO) #False negative rate
   f <- tp / (tp + 0.5 * (fp + fn))
   return(f)
 }
 
-calculate_fscore<-function(genetic_HTO, calls){
-  genetic_HTO = as.character(genetic_HTO)
+calculate_fscore<-function(ground_truth, calls){
+  ground_truth = as.character(ground_truth)
   calls = as.character(calls)
 
-  htos = unique(genetic_HTO)
+  htos = unique(ground_truth)
   htos = htos[!(htos %in% c("Negative", "Doublet", "Multiplet"))]
 
   fscores = unlist(lapply(htos, function(HTO){
-    calculate_fscore_HTO(HTO, genetic_HTO, calls)
+    calculate_fscore_HTO(HTO, ground_truth, calls)
   }))
 
   return(mean(fscores))
