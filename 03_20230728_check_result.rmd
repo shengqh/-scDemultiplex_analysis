@@ -8,6 +8,17 @@ output:
     code_folding: hide
 ---
 
+```{r,eval=FALSE,echo=FALSE}
+library(xfun)
+
+source('/home/shengq2/program/scDemultiplex_analysis/common.r')
+
+xfun::Rscript_call(
+  rmarkdown::render,
+  list(input='/home/shengq2/program/scDemultiplex_analysis/03_20230728_check_result.rmd',
+       output_file=paste0(root_dir, get_date_str(), ".check_result.html")))
+```
+
 ```{r global options, include = FALSE}
 knitr::opts_chunk$set(echo=FALSE, include=TRUE, warning=FALSE, message=FALSE)
 ```
@@ -88,8 +99,8 @@ print_highlight_table_by_column <- function(csv_file){
   print(tbl)
 }
 
-print_table <- function(csv_file){
-  x <- read.csv(csv_file, row.names=1)
+print_table <- function(csv_file, row.names=1){
+  x <- read.csv(csv_file, row.names=row.names)
 
   tbl <- x %>% 
     kable(escape = FALSE) %>%
@@ -108,8 +119,8 @@ getTableRow<-function(filepath){
   return(paste0("```{r,echo=FALSE,results='asis'}\nprint_highlight_table_by_row('", filepath, "')\n```\n\n"))
 }
 
-getTable<-function(filepath){
-  return(paste0("```{r,echo=FALSE,results='asis'}\nprint_table('", filepath, "')\n```\n\n"))
+getTable<-function(filepath, row.names=1){
+  return(paste0("```{r,echo=FALSE,results='asis'}\nprint_table('", filepath, "', row.names=", row.names,")\n```\n\n"))
 }
 
 getFigure<-function(filepath){
@@ -183,13 +194,29 @@ figureRmd<-function(samples){
       result<-paste0(result, getTable(iter_file))
     }
 
+    result<-paste0(result, paste0("\n\n## F score of each iteration\n\n"))
+
+    #result<-paste0(result, getTable(paste0(prefix, ".iteration.fscore_detail.csv"), row.names="NULL"))
+    result<-paste0(result, getFigure(paste0(prefix, ".iteration.fscore_detail.png")))
+
     result<-paste0(result, paste0("\n\n## Demultiplex result\n\n"))
 
     result<-paste0(result, getTableColumn(paste0(prefix, ".cell.csv")))
     
+    result<-paste0(result, getFigure(paste0(prefix, ".ground_truth.1.png")))
+
     result<-paste0(result, getFigure(paste0(prefix, ".demulti1.png")))
 
+    if(name != "barnyard"){
+      result<-paste0(result, getFigure(paste0(prefix, ".ground_truth.2.png")))
+    }
+
     result<-paste0(result, getFigure(paste0(prefix, ".demulti2.png")))
+
+    result<-paste0(result, paste0("\n\n## F score\n\n"))
+
+    result<-paste0(result, getTableColumn(paste0(prefix, ".fscore_detail_long.csv")))
+    result<-paste0(result, getFigure(paste0(prefix, ".fscore_detail.png")))
   }
   return(result)
 }

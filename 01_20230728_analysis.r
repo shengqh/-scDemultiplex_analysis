@@ -5,12 +5,12 @@ if(is_unix) {
   source('C:/Users/sheng/Programs/scDemultiplex_analysis/common.r')
 }
 
-library(cellhashR)
+load_install("scDemultiplex", c('shengqh/cutoff', 'shengqh/scDemultiplex'))
 
 sample_map = list(
-  "hto12"=list("HTO"="hto12_hto_mtx.rds", "RNA"="hto12_umi_mtx.rds"),
-  "cellhashR_pbmc"=list("HTO"="GSM2895283_Hashtag-HTO-count.csv.gz"), #since we have ground truth, we don't filter cells by gene expression data
-  "pbmc"=list("HTO"="pbmc_hto_mtx.rds", "RNA"="pbmc_umi_mtx.rds")
+  #"hto12"=list("HTO"="hto12_hto_mtx.rds", "RNA"="hto12_umi_mtx.rds"),
+  #"cellhashR_pbmc"=list("HTO"="GSM2895283_Hashtag-HTO-count.csv.gz"), #since we have ground truth, we don't filter cells by gene expression data
+  #"pbmc"=list("HTO"="pbmc_hto_mtx.rds", "RNA"="pbmc_umi_mtx.rds")
 )
 
 ignored_tags<-c("no_match","ambiguous","total_reads","bad_struct")
@@ -107,6 +107,8 @@ prepare_data<-function(root_dir, sample_map, cur_sample) {
 }
 
 do_bff_raw<-function(root_dir, cur_sample) {
+  load_install("cellhashR", 'BimberLab/cellhashR')
+  
   sample_folder=paste0(root_dir, cur_sample)
   setwd(sample_folder)
 
@@ -148,8 +150,14 @@ do_bff_raw<-function(root_dir, cur_sample) {
 }
 
 do_bff_cluster<-function(root_dir, cur_sample) {
-  #if failed by thread issue, install preprocessCore manually
-  #https://github.com/Bioconductor/bioconductor_docker/issues/22
+  load_install("cellhashR", 'BimberLab/cellhashR')
+  
+  # if failed by thread issue, install preprocessCore manually
+  # https://github.com/Bioconductor/bioconductor_docker/issues/22
+  # git clone https://github.com/bmbolstad/preprocessCore.git
+  # cd preprocessCore
+  # R CMD INSTALL --configure-args="--disable-threading"  .
+  
   sample_folder=paste0(root_dir, cur_sample)
   setwd(sample_folder)
   
@@ -212,6 +220,10 @@ do_GMMDemux<-function(root_dir, sample_tags, cur_sample){
 }
 
 do_scDemultiplex<-function(root_dir, cur_sample, p.cuts=0.001){
+  #in order to run dff_cluster, we will need to install preprocessCore manually as single thread mode
+  #however, it would not work for scDemultiplex. So we need to install preprocessCore as multi-thread mode again
+  #BiocManager::install('preprocessCore', force=TRUE)
+
   for(p.cut in p.cuts){
     result_folder = get_scDemultiplex_folder(root_dir, cur_sample, p.cut)
     if(!dir.exists(result_folder)){
@@ -321,6 +333,8 @@ do_seurat_MULTIseqDemux<-function(root_dir, cur_sample){
 }
 
 do_demuxmix<-function(root_dir, cur_sample){
+  load_install("demuxmix")
+  
   sample_folder=paste0(root_dir, cur_sample)
   setwd(sample_folder)
 
@@ -405,12 +419,6 @@ do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample, scDemultipl
       do_bff_raw(root_dir, cur_sample)
     }
 
-    bff_cluster_file = paste0(root_dir, "/", cur_sample, "/bff_cluster/", cur_sample, ".bff_cluster.rds")
-    if(!file.exists(bff_cluster_file)){
-      cat("bff_cluster ...\n")
-      do_bff_cluster(root_dir, cur_sample)
-    }
-
     gmm_file = paste0(root_dir, "/", cur_sample, "/GMM-demux/GMM_full.csv")
     if(!file.exists(gmm_file)){
       cat("GMM-demux ...\n")
@@ -443,12 +451,30 @@ do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample, scDemultipl
   }
 
   do_scDemultiplex(root_dir, cur_sample, p.cuts=scDemultiplex.p.cuts)
-  
+
   cat("done.\n")
 }
 
-cur_sample = "pbmc8"
+cur_sample = "batch1_c1"
 for(cur_sample in samples){
   cat("processing", cur_sample, "\n")
-  do_analysis(root_dir, sample_map, sample_tags, cur_sample, scDemultiplex.p.cuts)
+
+  if(use_rlog){
+    do_scDemultiplex(root_dir, cur_sample, p.cuts=scDemultiplex.p.cuts)
+  }else{
+    do_analysis(root_dir, sample_map, sample_tags, cur_sample, scDemultiplex.p.cuts)
+  }
+}
+
+if(is_unix) {
+  # git clone https://github.com/bmbolstad/preprocessCore.git
+  # cd preprocessCore
+  # R CMD INSTALL --configure-args="--disable-threading"  .
+  devtools::install_github('bmbolstad/preprocessCore', dependencies = T, upgrade = 'always', configure.args = '--disable-threading', force=TRUE)
+  for(cur_sample in samples){
+    cat("processing", cur_sample, "bff_cluster\n")
+
+    do_bff_cluster(root_dir, cur_sample)
+  }
+  devtools::install_github('bmbolstad/preprocessCore', force=TRUE)
 }

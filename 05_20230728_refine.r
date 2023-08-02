@@ -1,6 +1,8 @@
 source('/home/shengq2/program/scDemultiplex_analysis/common.r')
 
 do_scDemultiplex_refine<-function(root_dir, cur_sample, p.cut=0.001){
+  load_install("scDemultiplex", c('shengqh/cutoff', 'shengqh/scDemultiplex'))
+
   sample_folder=paste0(root_dir, cur_sample)
   setwd(sample_folder)
 

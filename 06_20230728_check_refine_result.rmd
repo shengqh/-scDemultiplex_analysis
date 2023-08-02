@@ -1,0 +1,64 @@
+---
+title: "scDemultiplex Refinement Report"
+author: "Quanhu Sheng"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  rmdformats::readthedown:
+    toc_depth: 3
+    code_folding: hide
+---
+
+```{r global options, include = FALSE}
+knitr::opts_chunk$set(echo=FALSE, include=TRUE, warning=FALSE, message=FALSE)
+```
+
+```{css, echo=FALSE}
+#content{
+    max-width:1920px;
+}
+```
+
+```{r,eval=FALSE,echo=FALSE}
+library(xfun)
+
+source('/home/shengq2/program/scDemultiplex_analysis/common.r')
+
+xfun::Rscript_call(
+  rmarkdown::render,
+  list(input='/home/shengq2/program/scDemultiplex_analysis/06_20230728_check_refine_result.rmd',
+       output_file=paste0(root_dir, get_date_str(), ".check_refine_result.html")))
+```
+
+```{r setup}
+library(knitr)
+library(kableExtra)
+
+source("/home/shengq2/program/scDemultiplex_analysis/common.r")
+
+print_table <- function(csv_file, row.names=1){
+  x <- read.csv(csv_file, row.names=row.names)
+
+  tbl <- x %>% 
+    kable(escape = FALSE) %>%
+    kable_classic(full_width = T, 
+                  html_font = "Cambria", 
+                  font_size = 20)
+  
+  print(tbl)
+}
+
+```
+
+# Adjusted Rand Index
+
+```{r, echo=FALSE, results="asis"}
+print_table(paste0(root_dir, "refine_ari.csv"))
+```
+Note: the number in brackets is the result using the approach alone. Red/blue indicates increased/decreased values after scDemultiplex refinement.
+
+# F score
+
+```{r, echo=FALSE, results="asis"}
+print_table(paste0(root_dir, "refine_fscore.csv"))
+```
+Note: the number in brackets is the result using the approach alone. Red/blue indicates increased/decreased values after scDemultiplex refinement.

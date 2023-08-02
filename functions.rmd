@@ -1,0 +1,139 @@
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(digest)
+library(DT)
+library(ggpubr)
+library(patchwork)
+library(data.table)
+library(htmlTable)
+library(tools)
+library(ggExtra)
+library(kableExtra)
+
+get_date_str = function(){
+  format(Sys.time(), "%Y%m%d")
+}
+
+check_md5<-function(filepath, expect_md5, return_md5=FALSE){
+  if(!file.exists(filepath)){
+    stop("File not exists: ", filepath)
+  }
+  md5=tools::md5sum(filepath)
+
+  if(expect_md5 == ""){
+    if(return_md5){
+      return(md5)
+    }else{
+      cat(basename(filepath), "md5=", md5, "\n")
+    }
+  }else{
+    if(md5 != expect_md5){
+      stop("md5 not match, expect ", expect_md5, " but got ", md5, " for file ", filepath)
+    }
+  }
+}
+
+theme_bw3 <- function () { 
+	theme_bw() +
+	theme(
+		strip.background = element_rect(fill = NA, colour = 'black'),
+		panel.border = element_rect(fill = NA, color = "black"),			
+		axis.line = element_line(colour = "black", linewidth = 0.5)
+	)
+}
+
+get_hist_density<-function(data, x, title=x, bins=20){
+  ggplot(data, aes(x=!!sym(x))) + geom_histogram(aes(y = ..density..), colour = 1, fill = "white", bins=bins) + geom_density() + ggtitle(title) + theme_bw3()
+}
+
+print_table<-function(tbl, round_value=3, byDT=FALSE, row.names=TRUE){
+  tbl <- tbl |> mutate(across(where(is.numeric), round, round_value))
+  if(byDT){
+    DT::datatable(tbl, rownames = row.names)
+  }else{
+    print(kable(tbl, row.names = row.names))
+  }
+}
+
+show_descriptive_statistics<-function(data){
+  dd = data
+  dd$fakevar = 1
+  dd$fakevar <- factor(dd$fakevar, levels = c(1), labels = c("Subject"))
+  label(dd$fakevar) <- "Subject"
+
+  dd_formula = paste0(paste0(colnames(data), collapse=" + "), " ~ fakevar")
+  print_descriptive_statistics(as.formula(dd_formula), dd, test = FALSE)
+}
+
+print_descriptive_statistics<-function(formula, data, test = TRUE, overall = FALSE, continuous = 5, ...){
+  output <- summaryM(formula = formula,
+                      data = data, 
+                      test = test, 
+                      overall = overall, 
+                      continuous = continuous, ...)
+  latex_tbl = latex(output, html=TRUE, width=0.8 )
+  cat(latex_tbl)
+}
+
+#https://stackoverflow.com/questions/74522672/kable-highlighting-the-largest-value-in-each-row-r-knitr
+print_highlight_table_by_row <- function(csv_file){
+  x <- read.csv(csv_file, row.names=1)
+  
+  max_values <- x |>
+    mutate(across(where(is.numeric), round, 3)) |>
+    purrr::pmap(pmax, na.rm = TRUE) |>
+    as.numeric() |>
+    na.omit()
+  
+  tbl <- x |>
+    mutate(across(where(is.numeric), round, 3)) |>
+    mutate(across(where(is.numeric), ~ if_else(.x == max_values[row_number()],
+                                cell_spec(.x,
+                                          format = "html",
+                                          color = "red", bold = TRUE
+                                ), as.character(.x)
+    ))) |>
+    mutate(across(where(is.numeric), ~ ifelse(.x == "NaN", "", .))) |>
+    kable(escape = FALSE) |>
+    kable_classic(
+      full_width = T,
+      html_font = "Cambria",
+      font_size = 20
+    )
+  print(tbl)
+}
+
+print_highlight_table_by_column <- function(csv_file){
+  x <- read.csv(csv_file, row.names=1)
+  x <- x |> mutate(across(where(is.numeric), round, 4))
+  
+  top2 = apply(x, 2, function(x){
+    sort(x, decreasing = T)[1:2]
+  })
+  first = top2[1,]
+  second = top2[2,]
+
+  tbl <- x |> 
+    mutate(across(where(is.numeric), ~if_else(.x == first[cur_column()],
+                               cell_spec(.x,format =  "html",color = "red", bold = TRUE), 
+                               if_else(as.character(.x) == second[cur_column()],
+                                       cell_spec(.x,format =  "html",color = "blue", bold = TRUE), 
+                                       as.character(.x))))) |> 
+    kable(escape = FALSE) |> 
+    kable_classic(full_width = T, 
+                  html_font = "Cambria", 
+                  font_size = 20)
+  print(tbl)
+}
+
+getTableColumn<-function(filepath){
+  return(paste0("```{r,echo=FALSE,results='asis'}\nprint_highlight_table_by_column('", filepath, "')\n```\n\n"))
+}
+
+getTableRow<-function(filepath){
+  return(paste0("```{r,echo=FALSE,results='asis'}\nprint_highlight_table_by_row('", filepath, "')\n```\n\n"))
+}
+
+```

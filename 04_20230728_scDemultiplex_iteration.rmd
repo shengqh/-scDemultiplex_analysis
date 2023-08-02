@@ -12,6 +12,7 @@ output:
 library(knitr)
 knitr::opts_chunk$set(echo=FALSE, include=TRUE, warning=FALSE, message=FALSE)
 source('/home/shengq2/program/scDemultiplex_analysis/common.r')
+knitr::opts_knit$set(root.dir = root_dir)
 ```
 
 ```{css, echo=FALSE}
@@ -21,11 +22,15 @@ source('/home/shengq2/program/scDemultiplex_analysis/common.r')
 ```
 
 ```{r,eval=FALSE,echo=FALSE}
-rmarkdown::render(input="/home/shengq2/program/scDemultiplex_analysis/04_20230519.scDemultiplex.iteration.rmd",
-                  output_dir = "/nobackup/h_cqs/collaboration/20230522_scrna_hto",
-                  output_file="20230522.scDemultiplex.iteration.html")
-```
+library(xfun)
 
+source('/home/shengq2/program/scDemultiplex_analysis/common.r')
+
+xfun::Rscript_call(
+  rmarkdown::render,
+  list(input="/home/shengq2/program/scDemultiplex_analysis/04_20230728_scDemultiplex_iteration.rmd",
+       output_file=paste0(root_dir, get_date_str(), ".scDemultiplex_iteration.html")))
+```
 
 ```{r results='asis'}
 batch="batch2_c1"
@@ -34,28 +39,30 @@ for(batch in samples){
   prefix=paste0(batch_dir, "/scDemultiplex.0.001/", batch)
   detail<-read.csv(paste0(prefix, ".HTO.iteration.detail.csv"), row.names=1)
   
-  ari<-read.csv(paste0(batch_dir, "/", batch, ".ari.csv"), row.names=1)
-  fscore<-read.csv(paste0(batch_dir, "/", batch, ".fscore.csv"), row.names=1)
+  ari<-read.csv(paste0(batch_dir, "/", batch, ".iteration.ari.csv"), row.names=1)
+  fscore<-read.csv(paste0(batch_dir, "/", batch, ".iteration.fscore.csv"), row.names=1)
 
   cat("# ", batch, "\n\n")
   xnames = paste0('X', c(0:10))
   xnames = xnames[xnames %in% colnames(detail)]
-  xi=3
+  xi=1
   for(xi in c(1:(length(xnames)-1))){
     yi = xi+1
     xn = xnames[xi]
     yn = xnames[yi]
-    x_ari = ifelse(xn == 'X0', ari["scDemultiplex_cutoff", 1], ari[xn,1])
+    x_ari = ari[xn,1]
     y_ari = ari[yn,1]
-    x_fscore = ifelse(xn == 'X0', fscore["scDemultiplex_cutoff", 1], fscore[xn,1])
+    x_fscore = fscore[xn,1]
     y_fscore = fscore[yn,1]
     
     cat(paste0("## ", xnames[xi], " to ", xnames[yi], "\n"))
     
-    df<-data.frame("Name"=c(xn, yn), "ARI"=c(x_ari, y_ari), "Fscore"=c(x_fscore, y_fscore))
+    df<-data.frame("ARI"=c(x_ari, y_ari), "Fscore"=c(x_fscore, y_fscore))
+    rownames(df) = c(xn, yn)
     
-    
-    print(kable(df))
+    tdf = data.frame(t(df))
+    tdf$increase = tdf[,2] - tdf[,1]
+    print(kable(tdf))
     
     move_tb = table(detail[,xn], detail[,yn])
     should_stop = scDemultiplex:::should_stop(detail[,xn], detail[,yn])

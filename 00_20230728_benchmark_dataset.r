@@ -8,6 +8,8 @@ if(is_unix) {
   source('C:/Users/sheng/Programs/scDemultiplex_analysis/common.r')
 }
 
+load_install("scDemultiplex", c('shengqh/cutoff', 'shengqh/scDemultiplex'))
+
 #https://www.biorxiv.org/content/biorxiv/early/2023/01/16/2022.12.20.521313.full.pdf
 #https://github.com/Oshlack/hashtag-demux-paper
 
@@ -19,16 +21,38 @@ if(!dir.exists("hashtag-demux-paper")){
 if(1){
   data_dir = paste0(root_dir, "hashtag-demux-paper/data/BAL_data/")
 
-  #For each of the batches need a list of the HTOs and the associated genetic donors.
-  donor_list = list(
-    "batch1" = list("donor_A" = "Human-HTO-3", "donor_B" = "Human-HTO-1", "donor_C" = "Human-HTO-4", "donor_D" = "Human-HTO-2", "donor_E" = "Human-HTO-8", "donor_F" = "Human-HTO-6", "donor_G" = "Human-HTO-5", "donor_H" = "Human-HTO-7", "doublet" = "Doublet", "unassigned" = "Negative"),
-    "batch2" = list("donor_A" = "Human-HTO-7", "donor_B" = "Human-HTO-13", "donor_C" = "Human-HTO-15", "donor_D" = "Human-HTO-12", "donor_E" = "Human-HTO-6", "donor_F" = "Human-HTO-9", "donor_G" = "Human-HTO-14", "donor_H" = "Human-HTO-10", "doublet" = "Doublet", "unassigned" = "Negative"),
-    "batch3" = list("donor_A" = "Human-HTO-6", "donor_B" = "Human-HTO-10", "donor_C" = "Human-HTO-14", "donor_D" = "Human-HTO-13", "donor_E" = "Human-HTO-15", "donor_F" = "Human-HTO-7", "donor_G" = "Human-HTO-12", "donor_H" = "Human-HTO-9", "doublet" = "Doublet", "unassigned" = "Negative")
+  bal_donor_map = list(
+    "BAL A" = "BAL-01",
+    "BAL B" = "BAL-02",
+    "BAL C" = "BAL-03",
+    "BAL D" = "BAL-04",
+    "BAL E" = "BAL-05",
+    "BAL F" = "BAL-06",
+    "BAL G" = "BAL-07",
+    "BAL H" = "BAL-08",
+    "BAL I" = "BAL-09",
+    "BAL J" = "BAL-10",
+    "BAL K" = "BAL-11",
+    "BAL L" = "BAL-12",
+    "BAL M" = "BAL-13",
+    "BAL N" = "BAL-14",
+    "BAL O" = "BAL-15",
+    "BAL P" = "BAL-16",
+    "BAL Q" = "BAL-17",
+    "BAL R" = "BAL-18",
+    "BAL S" = "BAL-19",
+    "BAL T" = "BAL-20",
+    "BAL U" = "BAL-21",
+    "BAL V" = "BAL-22",
+    "BAL W" = "BAL-23",
+    "BAL X" = "BAL-24",
+    "Doublet" = "Doublet",
+    "Negative" = "Negative"
   )
 
   batch="batch1"
   capture="c1"
-  for(batch in names(donor_list)){
+  for(batch in c("batch1", "batch2", "batch3")){
     for(capture in c("c1", "c2")){
       cur_sample = paste0(batch, "_", capture)
 
@@ -46,23 +70,34 @@ if(1){
       print(cur_sample)
       
       counts <- read.csv(paste0(data_dir, cur_sample, "_hto_counts.csv"), check.names = FALSE, row.names = 1)
-      rownames(counts)<-gsub(" ","_", rownames(counts))
+      rownames(counts)<-gsub(" ","-", rownames(counts))
+      stopifnot(all(rownames(counts) %in% bal_donor_map))
+
       donors <- read.csv(paste0(data_dir, cur_sample, "_donors.csv"), row.names = 1)
-      donors$genetic_donor <- gsub(" ","_", donors$genetic_donor)
+      stopifnot(all(donors$genetic_donor %in% names(bal_donor_map)))
+      donors$genetic_donor <- unlist(bal_donor_map[donors$genetic_donor])
+      stopifnot(all(donors$genetic_donor %in% bal_donor_map))
 
       save_to_matrix(counts=as.sparse(counts), target_folder="data")
 
       rds_file=paste0(cur_sample, ".counts.rds")
       saveRDS(counts, rds_file)
 
-      obj <- scDemultiplex:::read_hto(rds_file)
-      
+      if(use_rlog){
+        obj <- CreateSeuratObject(counts = counts, assay="HTO")
+        # Normalize HTO data, here we use centered log-ratio (CLR) transformation
+        obj <- NormalizeData(obj, assay = "HTO", normalization.method = "LogNormalize")
+        DefaultAssay(object = obj) <- "HTO"
+      }else{
+        obj <- scDemultiplex:::read_hto(rds_file)
+      }
+      stopifnot(all(obj$nCount_HTO > 0))
       stopifnot(all(donors$Barcode == colnames(obj)))
 
       obj$ground_truth=donors$genetic_donor
 
       obj<-hto_umap(obj)
-      obj<-RunTSNE(obj, dims = 1:nrow(obj), perplexity = 100, check_duplicates = FALSE, verbose = FALSE)
+      #obj<-RunTSNE(obj, dims = 1:nrow(obj), perplexity = 100, check_duplicates = FALSE, verbose = FALSE)
       saveRDS(obj, obj_file)  
     }
   }
@@ -110,17 +145,79 @@ if(1){
     saveRDS(counts, rds_file)
 
     obj <- scDemultiplex:::read_hto(rds_file)
-
+    stopifnot(all(obj$nCount_HTO > 0))
     stopifnot(all(all_data$CellID == colnames(obj)))
     obj$ground_truth=all_data$CellType
 
     obj<-hto_umap(obj)
-    obj<-RunTSNE(obj, dims = 1:nrow(obj), perplexity = 100, check_duplicates = FALSE, verbose = FALSE)
+    #obj<-RunTSNE(obj, dims = 1:nrow(obj), perplexity = 100, check_duplicates = FALSE, verbose = FALSE)
     saveRDS(obj, obj_file)  
   }
 }
 
-if(1){
+if(0){#pbmc from original paper
+  library(readxl)
+  library(utils)
+
+  cur_sample="pbmc8"
+  sample_folder=paste0(root_dir, cur_sample)
+  if(!dir.exists(sample_folder)){
+    dir.create(sample_folder)
+  }
+  setwd(sample_folder)
+
+  obj_file = paste0(cur_sample, ".obj.rds")
+  if(file.exists(obj_file)){
+    next
+  }
+
+  print(cur_sample)
+
+  hto_file = 'GSM2895283_Hashtag-HTO-count.csv.gz'
+  if(!file.exists(hto_file)){
+    download.file('https://ftp.ncbi.nlm.nih.gov/geo/samples/GSM2895nnn/GSM2895283/suppl/GSM2895283_Hashtag-HTO-count.csv.gz', hto_file)
+  }
+  exp_file = 'GSM2895282_Hashtag-RNA.umi.txt.gz'
+  if(!file.exists(exp_file)){
+    download.file('https://ftp.ncbi.nlm.nih.gov/geo/samples/GSM2895nnn/GSM2895282/suppl/GSM2895282_Hashtag-RNA.umi.txt.gz', exp_file)
+  }
+
+  if(!dir.exists("scSplit_paper_data")){
+    system("git clone https://github.com/jon-xu/scSplit_paper_data/")
+  }
+  
+  n='A'
+  df = NULL
+  for(n in c('A', 'B', 'C','D', 'E', 'F', 'G', 'H', 'doublets')){
+    barcodes = readLines(paste0("scSplit_paper_data/Table 3/Hashtag/", n))
+    cur_df = data.frame("cell"=barcodes, "ground_truth"=ifelse(n == "doublets", "Doublet", paste0("Batch", n)))
+    df = rbind(df, cur_df)
+  }
+
+  hto_data <- data.frame(fread(hto_file), row.names=1)
+  counts <- hto_data[c(1:8),]
+  rownames(counts) <- gsub("-.*", "", rownames(counts))
+
+  stopifnot(all(df$cell %in% colnames(counts)))
+  counts = counts[,df$cell]
+
+  save_to_matrix(counts=as.sparse(counts), target_folder="data")
+
+  rds_file=paste0(cur_sample, ".counts.rds")
+  saveRDS(counts, rds_file)
+
+  obj <- scDemultiplex:::read_hto(rds_file)
+
+  stopifnot(all(df$cell == colnames(obj)))
+  obj$ground_truth=df$ground_truth
+
+  obj<-hto_umap(obj)
+  obj<-RunTSNE(obj, dims = 1:nrow(obj), perplexity = 100, check_duplicates = FALSE, verbose = FALSE)
+  saveRDS(obj, obj_file)  
+}
+
+
+if(1){#pbmc with new annotation
   library(utils)
 
   cur_sample="pbmc8"
@@ -140,12 +237,28 @@ if(1){
     }
 
     load(hto_file)
+    unlink(hto_file)
+
     counts = stoeckius_pbmc
     counts = t(counts)
+    rownames(counts)<-gsub("_","-", rownames(counts))
 
     #we got the ground_truth from Dr. Zhu, Qin, author of paper deMULTIplex2
     donors = read.table('/home/shengq2/program/scDemultiplex_analysis/pbmc_donor_ids.tsv', sep="\t", header=T, row.names=1, stringsAsFactors = F)
     rownames(donors)<-gsub("-.","", rownames(donors))
+
+    donor_map = list(
+      "donor6" = "HTO-A",
+      "donor0" = "HTO-B",
+      "donor8" = "HTO-C",
+      "donor10" = "HTO-D",
+      "donor5" = "HTO-E",
+      "donor11" = "HTO-F",
+      "donor2" = "HTO-G",
+      "donor7" = "HTO-H",
+      "doublet" = "Doublet",
+      "unassigned" = "Negative"
+    )
 
     stopifnot(all(colnames(counts) %in% rownames(donors)))
 
@@ -155,6 +268,7 @@ if(1){
     ids = ids[ids < 20]
 
     donors$donor_id[donors$donor_id %in% names(ids)] = "unassigned"
+    donors$hto = unlist(donor_map[donors$donor_id])
 
     save_to_matrix(counts=as.sparse(counts), target_folder="data")
 
@@ -162,11 +276,15 @@ if(1){
     saveRDS(counts, rds_file)
 
     obj <- scDemultiplex:::read_hto(rds_file)
+    stopifnot(all(obj$nCount_HTO > 0))
 
-    obj$ground_truth=donors$donor_id
+    obj$ground_truth=donors$hto
 
     obj<-hto_umap(obj)
-    obj<-RunTSNE(obj, dims = 1:nrow(obj), perplexity = 100, check_duplicates = FALSE, verbose = FALSE)
+    #obj<-RunTSNE(obj, dims = 1:nrow(obj), perplexity = 100, check_duplicates = FALSE, verbose = FALSE)
     saveRDS(obj, obj_file)  
   }
 }
+
+
+
