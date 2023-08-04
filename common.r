@@ -17,11 +17,9 @@ load_install("aricode")
 load_install("tictoc")
 load_install("mclust")
 
-use_rlog = FALSE
-
 is_unix=.Platform$OS.type == "unix"
 if(is_unix) {
-  root_dir=ifelse(use_rlog, "/nobackup/h_cqs/collaboration/20230728_scrna_hto_rlog/", "/nobackup/h_cqs/collaboration/20230725_scrna_hto/")
+  root_dir="/nobackup/h_cqs/collaboration/20230725_scrna_hto/"
 } else {
   root_dir="C:/projects/nobackup/h_cqs/collaboration/20230725_scrna_hto/"
 }
@@ -223,4 +221,58 @@ check_performance<-function(name, meta, truth_column, hashtag_to_truth, call_nam
 get_date_str<-function(){
   date_str = format(Sys.time(), "%Y%m%d")
   return(date_str)
+}
+
+do_scDemultiplex<-function(root_dir, cur_sample, p.cuts=0.001, do_rlog=FALSE){
+  load_install("scDemultiplex", c('shengqh/cutoff', 'shengqh/scDemultiplex'))
+
+  #in order to run dff_cluster, we will need to install preprocessCore manually as single thread mode
+  #however, it would not work for scDemultiplex. So we need to install preprocessCore as multi-thread mode again
+  #devtools::install_github('bmbolstad/preprocessCore', force=TRUE)
+
+  for(p.cut in p.cuts){
+    suffix = ifelse(do_rlog, "rlog", p.cut)
+    result_folder = get_scDemultiplex_folder(root_dir, cur_sample, suffix)
+    if(!dir.exists(result_folder)){
+      dir.create(result_folder)
+    }
+    setwd(result_folder)
+  
+    final_rds=paste0(cur_sample, ".scDemultiplex.rds")
+    if(!file.exists(final_rds)){
+      message("scDemultiplex", p.cut, "...\n")
+  
+      rds_file=paste0("../", cur_sample, ".obj.rds")
+      obj=readRDS(rds_file)
+      if(do_rlog){
+        obj <- NormalizeData(obj, normalization.method = "LogNormalize")
+      }
+  
+      ntags = nrow(obj)
+      
+      output_prefix<-paste0(cur_sample, ".HTO")
+      
+      message(paste0("starting ", cur_sample, " cutoff ...\n"))
+      tic()
+      cat("  scDemultiplex_cutoff ...\n")
+      obj<-demulti_cutoff(obj, output_prefix=output_prefix, cutoff_startval = 0, mc.cores=ntags)
+      toc1=toc()
+
+      obj<-hto_plot(obj, paste0(output_prefix, ".cutoff"), group.by="scDemultiplex_cutoff")
+
+      if(!do_rlog){
+        message(paste0("starting ", cur_sample, " cutoff ...\n"))
+        tic()
+        obj<-demulti_refine(obj, output_prefix=output_prefix, p.cut=p.cut, refine_negative_doublet_only=FALSE, mc.cores=ntags)
+        obj$scDemultiplex_full=obj$scDemultiplex
+        obj$scDemultiplex_full.global=obj$scDemultiplex.global
+        toc3=toc()
+  
+        saveRDS(list("cutoff"=toc1, "full"=toc3), paste0(cur_sample, ".scDemultiplex.tictoc.rds"))
+        obj<-hto_plot(obj, paste0(output_prefix, ".full_p"), group.by="scDemultiplex_full")
+      }
+  
+      saveRDS(obj, final_rds)
+    }
+  }
 }

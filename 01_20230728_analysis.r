@@ -219,52 +219,6 @@ do_GMMDemux<-function(root_dir, sample_tags, cur_sample){
   }
 }
 
-do_scDemultiplex<-function(root_dir, cur_sample, p.cuts=0.001){
-  #in order to run dff_cluster, we will need to install preprocessCore manually as single thread mode
-  #however, it would not work for scDemultiplex. So we need to install preprocessCore as multi-thread mode again
-  #BiocManager::install('preprocessCore', force=TRUE)
-
-  for(p.cut in p.cuts){
-    result_folder = get_scDemultiplex_folder(root_dir, cur_sample, p.cut)
-    if(!dir.exists(result_folder)){
-      dir.create(result_folder)
-    }
-    setwd(result_folder)
-  
-    final_rds=paste0(cur_sample, ".scDemultiplex.rds")
-    if(!file.exists(final_rds)){
-      cat("scDemultiplex", p.cut, "...\n")
-  
-      rds_file=paste0("../", cur_sample, ".obj.rds")
-      obj=readRDS(rds_file)
-  
-      ntags = nrow(obj)
-      
-      output_prefix<-paste0(cur_sample, ".HTO")
-      #output_prefix<-NULL
-      
-      tic(paste0("starting ", cur_sample, " cutoff ...\n"))
-      cat("  scDemultiplex_cutoff ...\n")
-      obj<-demulti_cutoff(obj, output_prefix=output_prefix, cutoff_startval = 0, mc.cores=ntags)
-      toc1=toc()
-
-      tic(paste0("starting ", cur_sample, " scDemultiplex_full ...\n"))
-      obj<-demulti_refine(obj, output_prefix=output_prefix, p.cut=p.cut, refine_negative_doublet_only=FALSE, mc.cores=ntags)
-      obj$scDemultiplex_full=obj$scDemultiplex
-      obj$scDemultiplex_full.global=obj$scDemultiplex.global
-      toc3=toc()
-  
-      saveRDS(list("cutoff"=toc1, "full"=toc3), paste0(cur_sample, ".scDemultiplex.tictoc.rds"))
-  
-      obj<-hto_plot(obj, paste0(output_prefix, ".cutoff"), group.by="scDemultiplex_cutoff")
-      #obj<-hto_plot(obj, paste0(output_prefix, ".refine_p"), group.by="scDemultiplex")
-      obj<-hto_plot(obj, paste0(output_prefix, ".full_p"), group.by="scDemultiplex_full")
-  
-      saveRDS(obj, final_rds)
-    }
-  }
-}
-
 do_seurat_HTODemux<-function(root_dir, cur_sample){
   sample_folder=paste0(root_dir, cur_sample)
   setwd(sample_folder)
@@ -450,31 +404,27 @@ do_analysis<-function(root_dir, sample_map, sample_tags, cur_sample, scDemultipl
     }
   }
 
-  do_scDemultiplex(root_dir, cur_sample, p.cuts=scDemultiplex.p.cuts)
+  do_scDemultiplex(root_dir, cur_sample, p.cuts=scDemultiplex.p.cuts, do_rlog=FALSE)
 
   cat("done.\n")
 }
 
-cur_sample = "batch1_c1"
+cur_sample = "barnyard"
 for(cur_sample in samples){
   cat("processing", cur_sample, "\n")
 
-  if(use_rlog){
-    do_scDemultiplex(root_dir, cur_sample, p.cuts=scDemultiplex.p.cuts)
-  }else{
-    do_analysis(root_dir, sample_map, sample_tags, cur_sample, scDemultiplex.p.cuts)
-  }
+  do_analysis(root_dir, sample_map, sample_tags, cur_sample, scDemultiplex.p.cuts)
 }
 
 if(is_unix) {
   # git clone https://github.com/bmbolstad/preprocessCore.git
   # cd preprocessCore
   # R CMD INSTALL --configure-args="--disable-threading"  .
-  devtools::install_github('bmbolstad/preprocessCore', dependencies = T, upgrade = 'always', configure.args = '--disable-threading', force=TRUE)
-  for(cur_sample in samples){
-    cat("processing", cur_sample, "bff_cluster\n")
+  # devtools::install_github('bmbolstad/preprocessCore', dependencies = T, upgrade = 'always', configure.args = '--disable-threading', force=TRUE)
+  # for(cur_sample in samples){
+  #   cat("processing", cur_sample, "bff_cluster\n")
 
-    do_bff_cluster(root_dir, cur_sample)
-  }
-  devtools::install_github('bmbolstad/preprocessCore', force=TRUE)
+  #   do_bff_cluster(root_dir, cur_sample)
+  # }
+  # devtools::install_github('bmbolstad/preprocessCore', force=TRUE)
 }

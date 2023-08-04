@@ -16,7 +16,7 @@ source('/home/shengq2/program/scDemultiplex_analysis/common.r')
 xfun::Rscript_call(
   rmarkdown::render,
   list(input='/home/shengq2/program/scDemultiplex_analysis/03_20230728_check_result.rmd',
-       output_file=paste0(root_dir, get_date_str(), ".check_result.html")))
+       output_file=paste0(root_dir, get_date_str(), ".main_result.html")))
 ```
 
 ```{r global options, include = FALSE}
@@ -194,11 +194,6 @@ figureRmd<-function(samples){
       result<-paste0(result, getTable(iter_file))
     }
 
-    result<-paste0(result, paste0("\n\n## F score of each iteration\n\n"))
-
-    #result<-paste0(result, getTable(paste0(prefix, ".iteration.fscore_detail.csv"), row.names="NULL"))
-    result<-paste0(result, getFigure(paste0(prefix, ".iteration.fscore_detail.png")))
-
     result<-paste0(result, paste0("\n\n## Demultiplex result\n\n"))
 
     result<-paste0(result, getTableColumn(paste0(prefix, ".cell.csv")))
@@ -213,7 +208,13 @@ figureRmd<-function(samples){
 
     result<-paste0(result, getFigure(paste0(prefix, ".demulti2.png")))
 
-    result<-paste0(result, paste0("\n\n## F score\n\n"))
+
+    result<-paste0(result, paste0("\n\n## F score of each iteration\n\n"))
+
+    result<-paste0(result, getTable(paste0(prefix, ".iteration.fscore.csv")))
+    result<-paste0(result, getFigure(paste0(prefix, ".iteration.fscore_detail.png")))
+
+    result<-paste0(result, paste0("\n\n## F score of each hashtag\n\n"))
 
     result<-paste0(result, getTableColumn(paste0(prefix, ".fscore_detail_long.csv")))
     result<-paste0(result, getFigure(paste0(prefix, ".fscore_detail.png")))

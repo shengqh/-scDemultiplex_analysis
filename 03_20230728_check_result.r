@@ -140,6 +140,7 @@ prepare_sample<-function(root_dir, sample_tags, name){
   names(colors) = levels
   global_colors=c("Singlet"="gray", "Negative"="blue", "Multiplet"="red")
   
+  col = cur_htocols[1]
   for(col in cur_htocols){
     htos@meta.data[,col] = as.character(htos@meta.data[,col])
 
@@ -171,8 +172,8 @@ prepare_sample<-function(root_dir, sample_tags, name){
 }
 
 #name="barnyard"
-name="pbmc8"
-#name="batch1_c1"
+#name="pbmc8"
+name="batch1_c1"
 process_sample<-function(root_dir, sample_tags, hashtag_to_truth, name){
   setwd(file.path(root_dir, name))
 
@@ -283,10 +284,12 @@ process_sample<-function(root_dir, sample_tags, hashtag_to_truth, name){
   print(g)
   dev.off()
 
+  fscores_df$method = factor(fscores_df$method, levels=unique(fscores_df$method))
   fscore_long_df = reshape2::acast(fscores_df, method ~ hashtag, value.var="fscore")
   write.csv(fscore_long_df, paste0(name, ".fscore_detail_long.csv"), row.names=T)
 
   cur_iterations = iterations[iterations %in% rownames(res$ari_df)]
+  cur_iterations = cur_iterations[1:(length(cur_iterations)-1)]
   ari_df=res$ari_df[cur_iterations,,drop=F]
   fscore_df=res$fscore_df[cur_iterations,,drop=F]
   fscores_df=res$fscores_df[res$fscores_df$method %in% cur_iterations,,drop=F]

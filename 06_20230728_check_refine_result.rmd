@@ -26,7 +26,7 @@ source('/home/shengq2/program/scDemultiplex_analysis/common.r')
 xfun::Rscript_call(
   rmarkdown::render,
   list(input='/home/shengq2/program/scDemultiplex_analysis/06_20230728_check_refine_result.rmd',
-       output_file=paste0(root_dir, get_date_str(), ".check_refine_result.html")))
+       output_file=paste0(root_dir, get_date_str(), ".refine_result.html")))
 ```
 
 ```{r setup}
@@ -35,14 +35,43 @@ library(kableExtra)
 
 source("/home/shengq2/program/scDemultiplex_analysis/common.r")
 
+get_color <- function(x){
+  if (!grepl('[(]', x)) {
+    return("black")
+  }
+  parts = unlist(strsplit(x, " "))
+  newv = as.numeric(parts[1])
+  oldv = as.numeric(substring(parts[2], 2, nchar(parts[2])-1))
+  if (newv > oldv) {
+    return("red")
+  } else if (newv < oldv) {
+    return("blue")
+  } else {
+    return("black")
+  }
+}
+
+get_row_color <- function(x){
+  return(unlist(lapply(x, get_color)))
+}
+
+#x="0.267 (0.267)"
+stopifnot("red" == get_color("0.667 (0.46)"))
+stopifnot("blue" == get_color("0.267 (0.46)"))
+stopifnot("black"== get_color("0.267 (0.267)"))
+stopifnot("black"== get_color("pbmc8"))
+
 print_table <- function(csv_file, row.names=1){
   x <- read.csv(csv_file, row.names=row.names)
 
-  tbl <- x %>% 
-    kable(escape = FALSE) %>%
-    kable_classic(full_width = T, 
-                  html_font = "Cambria", 
-                  font_size = 20)
+  tbl <- x |>
+    mutate_all(~ cell_spec(., format = "html", color = get_row_color(.), bold = FALSE)) |>
+    kable(escape = FALSE) |>
+    kable_classic(
+      full_width = T,
+      html_font = "Cambria",
+      font_size = 20
+    )
   
   print(tbl)
 }

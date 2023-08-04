@@ -1,5 +1,5 @@
 ---
-title: "HTO Report"
+title: "scDemultiplex rlog normalization report"
 author: "Quanhu Sheng"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
@@ -7,19 +7,6 @@ output:
     toc_depth: 3
     code_folding: hide
 ---
-
-```{r setup, include = FALSE}
-library(knitr)
-knitr::opts_chunk$set(echo=FALSE, include=TRUE, warning=FALSE, message=FALSE, results='asis')
-source('/home/shengq2/program/scDemultiplex_analysis/common.r')
-knitr::opts_knit$set(root.dir = root_dir)
-```
-
-```{css, echo=FALSE}
-#content{
-    max-width:1920px;
-}
-```
 
 ```{r,eval=FALSE,echo=FALSE}
 library(xfun)
@@ -32,6 +19,20 @@ xfun::Rscript_call(
        output_file=paste0(root_dir, get_date_str(), ".rlog_scDemultiplex.html")))
 ```
 
+```{r setup, include = FALSE}
+library(knitr)
+library(kableExtra)
+knitr::opts_chunk$set(echo=FALSE, include=TRUE, warning=FALSE, message=FALSE, results='asis')
+source('/home/shengq2/program/scDemultiplex_analysis/common.r')
+knitr::opts_knit$set(root.dir = root_dir)
+```
+
+```{css, echo=FALSE}
+#content{
+    max-width:1920px;
+}
+```
+
 ```{r results='asis'}
 
 final_df = NULL
@@ -42,41 +43,23 @@ for(sample in samples){
   
   sample_dir = paste0(root_dir, sample)
   clr_prefix=paste0(sample_dir, "/scDemultiplex.0.001/", sample, ".HTO_")
-  rlog_prefix=paste0(sample_dir, "/scDemultiplex_rlog/", sample, ".HTO_")
+  rlog_prefix=paste0(sample_dir, "/scDemultiplex.rlog/", sample, ".HTO_")
 
   clr_obj = readRDS(paste0(sample_dir, "/", sample, ".results_obj.rds"))
-
-  rlog_rds = paste0(sample_dir, "/scDemultiplex_rlog/", sample, ".scDemultiplex_rlog.cutoff.rds")
-  has_rlog = file.exists(rlog_rds)
-  if(has_rlog){
-    rlog_obj = readRDS(rlog_rds)
-  }else{
-    rlog_obj = NULL
-  }
+  rlog_obj = readRDS(paste0(sample_dir, "/scDemultiplex.rlog/", sample, ".scDemultiplex.rds"))
 
   truth_column = get_ground_truth_column(clr_obj)
 
   clr_check = check_performance(sample, clr_obj@meta.data, truth_column, hashtag_to_truth, "scDemultiplex_cutoff", allow_call_name_missing = FALSE)
-  if(has_rlog){
-    rlog_check = check_performance(sample, rlog_obj@meta.data, truth_column, hashtag_to_truth, "scDemultiplex_cutoff", allow_call_name_missing = FALSE)
-  }else{
-    rlog_check = NULL
-  }
-
-  if(!has_rlog){
-    failed = readLines(paste0(sample_dir, "/scDemultiplex_rlog/", sample, ".HTO.failed_tags.txt"))
-    cat("\n\nUsing rlog normalization failed to find cutoff for those hashtags: ", paste0(failed, collapse=", "),  "\n\n")
-  }else{
-    failed = c()
-  }
+  rlog_check = check_performance(sample, rlog_obj@meta.data, truth_column, hashtag_to_truth, "scDemultiplex_cutoff", allow_call_name_missing = FALSE)
 
   clr_ari=clr_check$ari_df[1,1]
   clr_fscore=clr_check$fscore_df[1,1]
 
-  rlog_ari = ifelse(has_rlog, rlog_check$ari_df[1,1], "failed")
-  rlog_fscore = ifelse(has_rlog, rlog_check$fscore_df[1,1], "failed")
+  rlog_ari = rlog_check$ari_df[1,1]
+  rlog_fscore = rlog_check$fscore_df[1,1]
 
-  final_df = rbind(final_df, data.frame(sample=sample, clr_ari=clr_ari, clr_fscore=clr_fscore, rlog_ari=rlog_ari, rlog_fscore=rlog_fscore, failed=paste0(failed, collapse=", ")))
+  final_df = rbind(final_df, data.frame(sample=sample, clr_ari=clr_ari, rlog_ari=rlog_ari, clr_fscore=clr_fscore, rlog_fscore=rlog_fscore))
 
   cat('<table>\n')
   cat('<th><td>CLR</td><td>logNorm</td></th>\n')
@@ -88,19 +71,24 @@ for(sample in samples){
     clr_file = paste0(clr_prefix, tag, ".cutoff.png")
     rlog_file = paste0(rlog_prefix, tag,".cutoff.png")
     if(file.exists(clr_file) && file.exists(rlog_file)){
-      cat('<tr><td>', ifelse(tag %in% failed, paste0("<mark>", tag, "</mark>"), tag), '</td><td>![](', clr_file,')</td><td>![](', rlog_file, ')</td></tr>\n')
+      cat('<tr><td>', tag, '</td><td>![](', clr_file,')</td><td>![](', rlog_file, ')</td></tr>\n')
     }
   }
   cat("\n\n</table>\n\n")
-
-  if(!has_rlog){
-    cat("\nHighlighed tag means it failed to find cutoff using rlog normalized count.\n\n")
-  }
+  cat("\n\n- Red dashed lines indicate two estimated gaussian distributions. \n\n- Red solid line indicate estimated gaussian mixture distribution.\n\n- Brown line indicates the cutoff detected from the estimated gaussian mixture distribution.\n\n")
 }
 ```
 
 # Summary
 
 ```{r}
-print(kable(final_df))
+tbl <- final_df |>
+  mutate(across(where(is.numeric), round, 3)) |>
+  kable(escape = FALSE) |>
+  kable_classic(
+    full_width = T,
+    html_font = "Cambria",
+    font_size = 20
+  )
+print(tbl)
 ```
