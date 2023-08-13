@@ -58,9 +58,21 @@ get_all_hto_methods<-function(root_dir, name, htocols){
 }
 
 get_alltags_umap<-function(htos, group.by, colors, legend_type, group.title=group.by){
-  g = DimPlot(htos, reduction="umap", group.by=group.by) + 
+  print(group.by)
+
+  new_clusters = 1:length(colors)
+  names(new_clusters) = names(colors)
+
+  new_colors = colors
+  names(new_colors) = new_clusters
+
+  new_names = paste0(new_clusters, ": ", names(colors))
+
+  htos$hto = unlist(new_clusters[htos@meta.data[,group.by]])
+
+  g <- DimPlot(htos, reduction="umap", group.by="hto", label=TRUE) + 
+    scale_color_manual(values=new_colors, labels = new_names, guide = guide_legend(ncol=1)) +
     ggtitle(group.title) + 
-    scale_color_manual(values=colors) + 
     theme(aspect.ratio = 1)
 
   if(legend_type == "corner"){
@@ -144,6 +156,8 @@ prepare_sample<-function(root_dir, sample_tags, name){
   for(col in cur_htocols){
     htos@meta.data[,col] = as.character(htos@meta.data[,col])
 
+    #saveRDS(list(htos=htos, col=col, colos=colors), paste0(name, ".umap_data.rds"))
+
     g1 = get_alltags_umap(htos = htos, 
       group.by = col, 
       colors = colors, 
@@ -171,9 +185,9 @@ prepare_sample<-function(root_dir, sample_tags, name){
   return(list(htos=htos, htocols=cur_htocols, g1=g1, g2=g2, colors=colors, global_colors=global_colors))
 }
 
-#name="barnyard"
+name="barnyard"
 #name="pbmc8"
-name="batch1_c1"
+#name="batch1_c1"
 process_sample<-function(root_dir, sample_tags, hashtag_to_truth, name){
   setwd(file.path(root_dir, name))
 
@@ -299,7 +313,8 @@ process_sample<-function(root_dir, sample_tags, hashtag_to_truth, name){
   write.csv(fscores_df, paste0(name, ".iteration.fscore_detail.csv"), row.names=F)
 
   fscores_df$method = as.numeric(gsub("X", "", fscores_df$method))
-  g<-ggplot(fscores_df, aes(method, fscore)) + geom_point(aes(color=hashtag)) + geom_path(aes(color=hashtag)) + xlab("") + ylab("F score")+ ggtitle(name) + theme_bw3(rotatex=TRUE)
+  g<-ggplot(fscores_df, aes(method, fscore)) + geom_point(aes(color=hashtag)) + geom_path(aes(color=hashtag)) + 
+    xlab("Iteration") + ylab("F score")+ ggtitle(name) + theme_bw3(rotatex=TRUE) + scale_x_continuous(breaks=unique(fscores_df$method))
   png(paste0(name, ".iteration.fscore_detail.png"), width=1500, height=1300, res=300)
   print(g)
   dev.off()

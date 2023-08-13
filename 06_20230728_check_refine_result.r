@@ -55,7 +55,7 @@ to_df<-function(ari_df){
   ari_df = cbind(oari_df, sari_df)
   colnames(ari_df) = c("original", "refine")
   ari_df = data.frame(round(ari_df, digits=3))
-  ari_df$combined = paste0(ari_df[,"refine"], " (", ari_df[,"original"], ")")
+  ari_df$combined = paste0(ari_df[,"refine"], "(", ari_df[,"original"], ")")
   return(ari_df)
 }
   

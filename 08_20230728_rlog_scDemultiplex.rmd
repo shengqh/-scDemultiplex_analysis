@@ -43,23 +43,27 @@ for(sample in samples){
   
   sample_dir = paste0(root_dir, sample)
   clr_prefix=paste0(sample_dir, "/scDemultiplex.0.001/", sample, ".HTO_")
-  rlog_prefix=paste0(sample_dir, "/scDemultiplex.rlog/", sample, ".HTO_")
+  rlog_prefix=paste0(sample_dir, "/scDemultiplex.rlog/", sample, ".HTO.")
 
   clr_obj = readRDS(paste0(sample_dir, "/", sample, ".results_obj.rds"))
-  rlog_obj = readRDS(paste0(sample_dir, "/scDemultiplex.rlog/", sample, ".scDemultiplex.rds"))
-
   truth_column = get_ground_truth_column(clr_obj)
 
-  clr_check = check_performance(sample, clr_obj@meta.data, truth_column, hashtag_to_truth, "scDemultiplex_cutoff", allow_call_name_missing = FALSE)
-  rlog_check = check_performance(sample, rlog_obj@meta.data, truth_column, hashtag_to_truth, "scDemultiplex_cutoff", allow_call_name_missing = FALSE)
-
+  clr_check = check_performance(sample, clr_obj@meta.data, truth_column, hashtag_to_truth, "scDemultiplex_full", allow_call_name_missing = FALSE)
   clr_ari=clr_check$ari_df[1,1]
   clr_fscore=clr_check$fscore_df[1,1]
 
-  rlog_ari = rlog_check$ari_df[1,1]
-  rlog_fscore = rlog_check$fscore_df[1,1]
+  rlog_rds = paste0(sample_dir, "/scDemultiplex.rlog/", sample, ".scDemultiplex.rds")
+  if(file.exists(rlog_rds)){
+    rlog_obj = readRDS(paste0(sample_dir, "/scDemultiplex.rlog/", sample, ".scDemultiplex.rds"))
+    rlog_check = check_performance(sample, rlog_obj@meta.data, truth_column, hashtag_to_truth, "scDemultiplex_full", allow_call_name_missing = FALSE)
+    rlog_ari = rlog_check$ari_df[1,1]
+    rlog_fscore = rlog_check$fscore_df[1,1]
+  }else{
+    rlog_ari = 0
+    rlog_fscore = 0
+  }
 
-  final_df = rbind(final_df, data.frame(sample=sample, clr_ari=clr_ari, rlog_ari=rlog_ari, clr_fscore=clr_fscore, rlog_fscore=rlog_fscore))
+  final_df = rbind(final_df, data.frame(sample=sample, clr_ari=clr_ari, clr_fscore=clr_fscore, rlog_ari=rlog_ari, rlog_fscore=rlog_fscore))
 
   cat('<table>\n')
   cat('<th><td>CLR</td><td>logNorm</td></th>\n')
@@ -67,6 +71,7 @@ for(sample in samples){
   cat('<tr><td>Fscore</td><td>', clr_check$fscore_df[1,1], '</td><td>', rlog_fscore, '</td></tr>\n')
 
   tags = unlist(strsplit(sample_tags[[sample]], ','))
+  tag = tags[1]
   for(tag in tags){
     clr_file = paste0(clr_prefix, tag, ".cutoff.png")
     rlog_file = paste0(rlog_prefix, tag,".cutoff.png")
@@ -83,6 +88,7 @@ for(sample in samples){
 
 ```{r}
 tbl <- final_df |>
+  mutate(sample=recode(sample, "barnyard" = "Barnyard", "pbmc8" = "PBMC8")) |>
   mutate(across(where(is.numeric), round, 3)) |>
   kable(escape = FALSE) |>
   kable_classic(

@@ -78,6 +78,11 @@ print_highlight_table_by_row <- function(csv_file){
 print_highlight_table_by_column <- function(csv_file){
   x <- read.csv(csv_file, row.names=1)
   x <- x |> mutate(across(where(is.numeric), round, 4))
+  x[is.na(x)] <- 0
+
+  colnames(x)<-recode(colnames(x), 
+    "Negative"="Neg",
+    "Multiplet"="Multi")
   
   no_genetic_hto<-x[rownames(x) != "genetic_HTO",]
   top2 = apply(no_genetic_hto, 2, function(x){
@@ -94,8 +99,8 @@ print_highlight_table_by_column <- function(csv_file){
                                        as.character(.x))))) |> 
     kable(escape = FALSE) |> 
     kable_classic(full_width = T, 
-                  html_font = "Cambria", 
-                  font_size = 20)
+                  html_font = "Arial", 
+                  font_size = 15)
   print(tbl)
 }
 
@@ -105,8 +110,8 @@ print_table <- function(csv_file, row.names=1){
   tbl <- x %>% 
     kable(escape = FALSE) %>%
     kable_classic(full_width = T, 
-                  html_font = "Cambria", 
-                  font_size = 20)
+                  html_font = "Arial", 
+                  font_size = 15)
   
   print(tbl)
 }

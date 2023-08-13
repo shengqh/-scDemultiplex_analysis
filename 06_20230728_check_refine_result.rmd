@@ -39,9 +39,9 @@ get_color <- function(x){
   if (!grepl('[(]', x)) {
     return("black")
   }
-  parts = unlist(strsplit(x, " "))
+  parts = unlist(strsplit(x, "(", fixed = TRUE))
   newv = as.numeric(parts[1])
-  oldv = as.numeric(substring(parts[2], 2, nchar(parts[2])-1))
+  oldv = as.numeric(substring(parts[2], 1, nchar(parts[2])-1))
   if (newv > oldv) {
     return("red")
   } else if (newv < oldv) {
@@ -56,21 +56,22 @@ get_row_color <- function(x){
 }
 
 #x="0.267 (0.267)"
-stopifnot("red" == get_color("0.667 (0.46)"))
-stopifnot("blue" == get_color("0.267 (0.46)"))
-stopifnot("black"== get_color("0.267 (0.267)"))
+stopifnot("red" == get_color("0.667(0.46)"))
+stopifnot("blue" == get_color("0.267(0.46)"))
+stopifnot("black"== get_color("0.267(0.267)"))
 stopifnot("black"== get_color("pbmc8"))
 
 print_table <- function(csv_file, row.names=1){
   x <- read.csv(csv_file, row.names=row.names)
+  x[x==""]<-"/"
 
   tbl <- x |>
     mutate_all(~ cell_spec(., format = "html", color = get_row_color(.), bold = FALSE)) |>
     kable(escape = FALSE) |>
     kable_classic(
       full_width = T,
-      html_font = "Cambria",
-      font_size = 20
+      html_font = "Arial",
+      font_size = 15
     )
   
   print(tbl)

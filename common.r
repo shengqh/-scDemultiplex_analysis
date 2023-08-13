@@ -32,14 +32,14 @@ scDemultiplex.p.cuts = c(0.001)
 names(scDemultiplex.p.cuts) = c("scDemultiplex")
 
 samples = c(
-  "barnyard",
-  "pbmc8",
   "batch1_c1", 
   "batch1_c2", 
   "batch2_c1",
   "batch2_c2",
   "batch3_c1",
-  "batch3_c2"
+  "batch3_c2",
+  "barnyard",
+  "pbmc8"
 )
 
 batch1_tag = "BAL-01,BAL-02,BAL-03,BAL-04,BAL-05,BAL-06,BAL-07,BAL-08"
@@ -260,17 +260,15 @@ do_scDemultiplex<-function(root_dir, cur_sample, p.cuts=0.001, do_rlog=FALSE){
 
       obj<-hto_plot(obj, paste0(output_prefix, ".cutoff"), group.by="scDemultiplex_cutoff")
 
-      if(!do_rlog){
-        message(paste0("starting ", cur_sample, " cutoff ...\n"))
-        tic()
-        obj<-demulti_refine(obj, output_prefix=output_prefix, p.cut=p.cut, refine_negative_doublet_only=FALSE, mc.cores=ntags)
-        obj$scDemultiplex_full=obj$scDemultiplex
-        obj$scDemultiplex_full.global=obj$scDemultiplex.global
-        toc3=toc()
-  
-        saveRDS(list("cutoff"=toc1, "full"=toc3), paste0(cur_sample, ".scDemultiplex.tictoc.rds"))
-        obj<-hto_plot(obj, paste0(output_prefix, ".full_p"), group.by="scDemultiplex_full")
-      }
+      message(paste0("starting ", cur_sample, " cutoff ...\n"))
+      tic()
+      obj<-demulti_refine(obj, output_prefix=output_prefix, p.cut=p.cut, refine_negative_doublet_only=FALSE, mc.cores=ntags)
+      obj$scDemultiplex_full=obj$scDemultiplex
+      obj$scDemultiplex_full.global=obj$scDemultiplex.global
+      toc3=toc()
+
+      saveRDS(list("cutoff"=toc1, "full"=toc3), paste0(cur_sample, ".scDemultiplex.tictoc.rds"))
+      obj<-hto_plot(obj, paste0(output_prefix, ".full_p"), group.by="scDemultiplex_full")
   
       saveRDS(obj, final_rds)
     }
